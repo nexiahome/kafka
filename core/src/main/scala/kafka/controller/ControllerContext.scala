@@ -74,6 +74,15 @@ class ControllerContext {
     }.toSet
   }
 
+  def replicasOnDeadBrokers(): Set[PartitionAndReplica] = {
+    partitionReplicaAssignment.flatMap {
+      case (topicPartition, replicas) => replicas.collect {
+        case (replicaId) if (!isReplicaOnline(replicaId, topicPartition)) =>
+            PartitionAndReplica(topicPartition, replicaId)
+      }
+    }.toSet
+  }
+
   def replicasForTopic(topic: String): Set[PartitionAndReplica] = {
     partitionReplicaAssignment
       .filter { case (topicPartition, _) => topicPartition.topic == topic }
