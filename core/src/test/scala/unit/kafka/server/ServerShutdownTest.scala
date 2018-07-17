@@ -29,6 +29,8 @@ import kafka.message.ByteBufferMessageSet
 import kafka.cluster.Broker
 import kafka.controller.{ControllerChannelManager, ControllerContext, StateChangeLogger}
 import kafka.log.LogManager
+import kafka.zookeeper.ZooKeeperClientTimeoutException
+import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.errors.KafkaStorageException
 import org.apache.kafka.common.metrics.Metrics
@@ -139,9 +141,10 @@ class ServerShutdownTest extends ZooKeeperTestHarness {
   @Test
   def testCleanShutdownAfterFailedStartup() {
     val newProps = TestUtils.createBrokerConfig(0, zkConnect)
-    newProps.setProperty("zookeeper.connect", "some.invalid.hostname.foo.bar.local:65535")
+    newProps.setProperty(KafkaConfig.ZkConnectionTimeoutMsProp, "50")
+    newProps.setProperty(KafkaConfig.ZkConnectProp, "some.invalid.hostname.foo.bar.local:65535")
     val newConfig = KafkaConfig.fromProps(newProps)
-    verifyCleanShutdownAfterFailedStartup[UnknownHostException](newConfig)
+    verifyCleanShutdownAfterFailedStartup[ZooKeeperClientTimeoutException](newConfig)
   }
 
   @Test
@@ -186,24 +189,18 @@ class ServerShutdownTest extends ZooKeeperTestHarness {
   }
 
   def verifyNonDaemonThreadsStatus() {
-    assertEquals(0, Thread.getAllStackTraces.keySet().toArray
-      .map{ _.asInstanceOf[Thread] }
+    assertEquals(0, Thread.getAllStackTraces.keySet.toArray
+      .map(_.asInstanceOf[Thread])
       .count(isNonDaemonKafkaThread))
   }
 
   @Test
   def testConsecutiveShutdown(){
     val server = new KafkaServer(config)
-    try {
-      server.startup()
-      server.shutdown()
-      server.awaitShutdown()
-      server.shutdown()
-      assertTrue(true)
-    }
-    catch{
-      case _: Throwable => fail()
-    }
+    server.startup()
+    server.shutdown()
+    server.awaitShutdown()
+    server.shutdown()
   }
 
   // Verify that if controller is in the midst of processing a request, shutdown completes
