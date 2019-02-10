@@ -57,7 +57,7 @@
               files="AbstractRequest.java|KerberosLogin.java|WorkerSinkTaskTest.java|TransactionManagerTest.java"/>
 
     <suppress checks="NPathComplexity"
-              files="(BufferPool|MetricName|Node|ConfigDef|SslTransportLayer|MetadataResponse|KerberosLogin|Selector|Sender|Serdes|Agent|Values|PluginUtils).java"/>
+              files="(BufferPool|MetricName|Node|ConfigDef|SslTransportLayer|MetadataResponse|KerberosLogin|Selector|Sender|Serdes|Agent|Values|PluginUtils|MockConsumer|Fetcher|AbstractLegacyRecordBatch|SslFactory|TokenInformation).java"/>
 
     <!-- clients tests -->
     <suppress checks="ClassDataAbstractionCoupling"
@@ -132,6 +132,9 @@
     <suppress checks="ClassDataAbstractionCoupling"
               files="(DistributedHerder|KafkaBasedLog)Test.java"/>
 
+    <suppress checks="ClassFanOutComplexity"
+              files="(WorkerSinkTaskTest|WorkerSourceTaskTest).java"/>
+
     <!-- Streams -->
     <suppress checks="ClassFanOutComplexity"
               files="(TopologyBuilder|KafkaStreams|KStreamImpl|KTableImpl|StreamThread|StreamTask).java"/>
@@ -162,7 +165,7 @@
     <suppress checks="NPathComplexity"
               files="StreamPartitionAssignor.java"/>
     <suppress checks="NPathComplexity"
-              files="StreamThread.java"/>
+              files="(StreamThread|AbstractStatus|KafkaConfigBackingStore).java"/>
 
     <!-- Streams tests -->
     <suppress checks="ClassFanOutComplexity"
@@ -192,7 +195,7 @@
               files="SmokeTestDriver.java"/>
 
     <suppress checks="NPathComplexity"
-              files="KStreamKStreamJoinTest.java|SmokeTestDriver.java"/>
+              files="KStreamKStreamJoinTest.java|SmokeTestDriver.java|EosTestDriver.java"/>
     <suppress checks="NPathComplexity"
               files="KStreamKStreamLeftJoinTest.java"/>
 

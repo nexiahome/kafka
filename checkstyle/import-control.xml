@@ -230,7 +230,7 @@
       <allow pkg="scala.collection" />
     </subpackage>
 
-    <subpackage name="test">
+    <subpackage name="tests">
       <allow pkg="kafka.admin" />
     </subpackage>
 
