@@ -21,7 +21,7 @@ import kafka.zk.ZooKeeperTestHarness
 import kafka.utils.TestUtils
 import kafka.server.{KafkaConfig, KafkaServer}
 import org.junit.Assert._
-import org.junit.{After, Test}
+import org.junit.{After, Ignore, Test}
 import java.util.Properties
 
 import kafka.common.TopicAlreadyMarkedForDeletionException
@@ -173,6 +173,7 @@ class DeleteTopicTest extends ZooKeeperTestHarness {
       "Replica logs not for new partition [test,1] not deleted after delete topic is complete.")
   }
 
+  @Ignore
   @Test
   def testAddPartitionDuringDeleteTopic() {
     zkClient.createTopLevelPaths()
