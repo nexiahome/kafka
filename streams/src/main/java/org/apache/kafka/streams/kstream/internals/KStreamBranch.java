@@ -26,7 +26,7 @@ class KStreamBranch<K, V> implements ProcessorSupplier<K, V> {
     private final Predicate<K, V>[] predicates;
 
     @SuppressWarnings("unchecked")
-    public KStreamBranch(Predicate<K, V> ... predicates) {
+    public KStreamBranch(Predicate<K, V>... predicates) {
         this.predicates = predicates;
     }
 
