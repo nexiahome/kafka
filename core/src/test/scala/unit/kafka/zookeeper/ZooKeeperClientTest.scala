@@ -35,6 +35,7 @@ import org.junit.Assert.{assertArrayEquals, assertEquals, assertFalse, assertTru
 import org.junit.{After, Before, Test}
 
 import scala.collection.JavaConverters._
+import scala.language.reflectiveCalls
 
 class ZooKeeperClientTest extends ZooKeeperTestHarness {
   private val mockPath = "/foo"
