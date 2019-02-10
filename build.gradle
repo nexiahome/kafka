@@ -873,6 +873,8 @@ project(':tools') {
 
     compile libs.jacksonJaxrsJsonProvider
     compile libs.jerseyContainerServlet
+    compile 'org.glassfish.jersey.core:jersey-common:2.28'
+    compile 'org.glassfish.jersey.inject:jersey-hk2:2.28'
     compile libs.jaxbApi // Jersey dependency that was available in the JDK before Java 9
     compile libs.activation // Jersey dependency that was available in the JDK before Java 9
     compile libs.jettyServer
@@ -1264,6 +1266,8 @@ project(':connect:runtime') {
 
     compile libs.jacksonJaxrsJsonProvider
     compile libs.jerseyContainerServlet
+    compile 'org.glassfish.jersey.core:jersey-common:2.28'
+    compile 'org.glassfish.jersey.inject:jersey-hk2:2.28'
     compile libs.jaxbApi // Jersey dependency that was available in the JDK before Java 9
     compile libs.activation // Jersey dependency that was available in the JDK before Java 9
     compile libs.jettyServer
