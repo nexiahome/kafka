@@ -250,7 +250,7 @@
       <allow class="kafka.zk.EmbeddedZookeeper"/>
     </subpackage>
 
-    <subpackage name="test">
+    <subpackage name="tests">
       <allow pkg="kafka.admin" />
     </subpackage>
 
