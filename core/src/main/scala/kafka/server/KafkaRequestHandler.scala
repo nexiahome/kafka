@@ -23,7 +23,7 @@ import kafka.metrics.KafkaMetricsGroup
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.yammer.metrics.core.Meter
+import com.codahale.metrics.Meter
 import org.apache.kafka.common.internals.FatalExitError
 import org.apache.kafka.common.utils.{KafkaThread, Time}
 

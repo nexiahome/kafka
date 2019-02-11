@@ -23,7 +23,7 @@ import java.util.concurrent._
 import java.util.concurrent.atomic._
 import java.util.concurrent.locks.ReentrantLock
 
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import kafka.api._
 import kafka.client.ClientUtils
 import kafka.cluster._
@@ -117,10 +117,10 @@ private[kafka] class ZookeeperConsumerConnector(val config: ConsumerConfig,
   private val rebalanceTimer = new KafkaTimer(newTimer("RebalanceRateAndTime", TimeUnit.MILLISECONDS, TimeUnit.SECONDS, Map("clientId" -> config.clientId)))
 
   newGauge(
-    "yammer-metrics-count",
+    "dropwizard-metrics-count",
     new Gauge[Int] {
-      def value = {
-        com.yammer.metrics.Metrics.defaultRegistry().allMetrics().size()
+      def getValue = {
+        com.codahale.metrics.SharedMetricRegistries.getOrCreate("default").getNames.size
       }
     }
   )
@@ -570,7 +570,7 @@ private[kafka] class ZookeeperConsumerConnector(val config: ConsumerConfig,
     @volatile private var allTopicsOwnedPartitionsCount = 0
     newGauge("OwnedPartitionsCount",
       new Gauge[Int] {
-        def value() = allTopicsOwnedPartitionsCount
+        def getValue() = allTopicsOwnedPartitionsCount
       },
       Map("clientId" -> config.clientId, "groupId" -> config.groupId))
 
@@ -740,7 +740,7 @@ private[kafka] class ZookeeperConsumerConnector(val config: ConsumerConfig,
                                       .foreach { case (topic, partitionThreadPairs) =>
               newGauge("OwnedPartitionsCount",
                 new Gauge[Int] {
-                  def value() = partitionThreadPairs.size
+                  def getValue() = partitionThreadPairs.size
                 },
                 ownedPartitionsCountMetricTags(topic))
             }
@@ -942,7 +942,7 @@ private[kafka] class ZookeeperConsumerConnector(val config: ConsumerConfig,
       newGauge(
         "FetchQueueSize",
         new Gauge[Int] {
-          def value = q.size
+          def getValue = q.size
         },
         Map("clientId" -> config.clientId,
           "topic" -> topicThreadId._1,

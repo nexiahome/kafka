@@ -21,7 +21,7 @@ package kafka.server
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.Lock
 
-import com.yammer.metrics.core.Meter
+import com.codahale.metrics.Meter
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils.Pool
 
