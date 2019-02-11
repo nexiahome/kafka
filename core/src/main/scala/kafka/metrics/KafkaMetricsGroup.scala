@@ -70,8 +70,10 @@ trait KafkaMetricsGroup extends Logging {
   def newGauge[T](name: String, metric: Gauge[T], tags: scala.collection.Map[String, String] = Map.empty) = {
     val registry = SharedMetricRegistries.getOrCreate("default")
     val fullName = metricName(name, tags)
-    registry.remove(fullName)
-    registry.register(fullName, metric)
+    val supplier: MetricRegistry.MetricSupplier[Gauge[_]] = new MetricRegistry.MetricSupplier[Gauge[_]] {
+      override def newMetric(): Gauge[T] = metric
+    }
+    registry.gauge(fullName, supplier).asInstanceOf[Gauge[T]]
   }
 
   def newMeter(name: String, eventType: String, timeUnit: TimeUnit, tags: scala.collection.Map[String, String] = Map.empty) = {
