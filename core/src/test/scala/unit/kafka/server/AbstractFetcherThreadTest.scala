@@ -18,7 +18,7 @@
 package kafka.server
 
 import AbstractFetcherThread._
-import com.yammer.metrics.Metrics
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.cluster.BrokerEndPoint
 import kafka.server.AbstractFetcherThread.{FetchRequest, PartitionData}
 import kafka.utils.TestUtils
@@ -36,8 +36,8 @@ class AbstractFetcherThreadTest {
 
   @Before
   def cleanMetricRegistry(): Unit = {
-    for (metricName <- Metrics.defaultRegistry().allMetrics().keySet().asScala)
-      Metrics.defaultRegistry().removeMetric(metricName)
+    for (metricName <- SharedMetricRegistries.getOrCreate("default").getNames.asScala)
+      SharedMetricRegistries.getOrCreate("default").remove(metricName)
   }
 
   @Test
@@ -58,7 +58,7 @@ class AbstractFetcherThreadTest {
     fetcherThread.shutdown()
 
     // after shutdown, they should be gone
-    assertTrue(Metrics.defaultRegistry().allMetrics().isEmpty)
+    assertTrue(SharedMetricRegistries.getOrCreate("default").getNames.isEmpty)
   }
 
   @Test
@@ -84,7 +84,13 @@ class AbstractFetcherThreadTest {
     fetcherThread.shutdown()
   }
 
-  private def allMetricsNames = Metrics.defaultRegistry().allMetrics().asScala.keySet.map(_.getName)
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
+  }
+
+  private def allMetricsNames = SharedMetricRegistries.getOrCreate("default").getNames.asScala.map(extractName(_))
 
   class DummyFetchRequest(val offsets: collection.Map[TopicPartition, Long]) extends FetchRequest {
     override def isEmpty: Boolean = offsets.isEmpty

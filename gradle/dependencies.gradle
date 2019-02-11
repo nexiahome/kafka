@@ -48,6 +48,8 @@ versions["baseScala"] = versions.scala.substring(0, versions.scala.lastIndexOf("
 
 versions += [
   activation: "1.1.1",
+  akka: "2.5.21",
+  akkaHttp: "10.1.7",
   apacheda: "2.0.0.AM2",
   apacheds: "2.0.0.AM25",
   argparse4j: "0.8.1",
@@ -68,9 +70,11 @@ versions += [
   kafka_0110: "0.11.0.3",
   kafka_10: "1.0.2",
   lz4: "1.5.0",
-  metrics: "2.2.0",
+  metrics: "4.1.0",
   // PowerMock 1.x doesn't support Java 9, so use PowerMock 2.0.0 beta
   powermock: "2.0.0",
+  prometheus: "0.6.0",
+  prometheusAkkaHttp: "0.4.0",
   reflections: "0.9.11",
   rocksDB: "5.18.33",
   scalatest: "3.0.5",
@@ -85,6 +89,9 @@ versions += [
 
 libs += [
   activation: "javax.activation:activation:$versions.activation",
+  akkaActor: "com.typesafe.akka:akka-actor_$versions.baseScala:$versions.akka",
+  akkaStream: "com.typesafe.akka:akka-stream_$versions.baseScala:$versions.akka",
+  akkaHttp: "com.typesafe.akka:akka-http_$versions.baseScala:$versions.akkaHttp",
   argparse4j: "net.sourceforge.argparse4j:argparse4j:$versions.argparse4j",
   apacheda: "org.apache.directory.api:api-all:$versions.apacheda",
   apachedsCoreApi: "org.apache.directory.server:apacheds-core-api:$versions.apacheds",
@@ -117,9 +124,12 @@ libs += [
   kafkaStreams_10: "org.apache.kafka:kafka-streams:$versions.kafka_10",
   log4j: "log4j:log4j:$versions.log4j",
   lz4: "org.lz4:lz4-java:$versions.lz4",
-  metrics: "com.yammer.metrics:metrics-core:$versions.metrics",
+  metrics: "io.dropwizard.metrics:metrics-core:$versions.metrics",
   powermockJunit4: "org.powermock:powermock-module-junit4:$versions.powermock",
   powermockEasymock: "org.powermock:powermock-api-easymock:$versions.powermock",
+  prometheus: "io.prometheus:simpleclient:$versions.prometheus",
+  prometheusHotspot: "io.prometheus:simpleclient_hotspot:$versions.prometheus",
+  prometheusAkkaHttp: "com.lonelyplanet:prometheus-akka-http_$versions.baseScala:$versions.prometheusAkkaHttp",
   reflections: "org.reflections:reflections:$versions.reflections",
   rocksDBJni: "org.rocksdb:rocksdbjni:$versions.rocksDB",
   scalaLibrary: "org.scala-lang:scala-library:$versions.scala",

@@ -24,8 +24,8 @@ import java.nio.channels.SocketChannel
 import java.util.{HashMap, Random}
 import javax.net.ssl._
 
-import com.yammer.metrics.core.{Gauge, Meter}
-import com.yammer.metrics.{Metrics => YammerMetrics}
+import com.codahale.metrics.{Gauge, Meter}
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.network.RequestChannel.SendAction
 import kafka.security.CredentialProvider
 import kafka.server.KafkaConfig
@@ -66,8 +66,8 @@ class SocketServerTest extends JUnitSuite {
   val localAddress = InetAddress.getLoopbackAddress
 
   // Clean-up any metrics left around by previous tests
-  for (metricName <- YammerMetrics.defaultRegistry.allMetrics.keySet.asScala)
-    YammerMetrics.defaultRegistry.removeMetric(metricName)
+  for (metricName <- SharedMetricRegistries.getOrCreate("default").getNames.asScala)
+    SharedMetricRegistries.getOrCreate("default").remove(metricName)
 
   val server = new SocketServer(config, metrics, Time.SYSTEM, credentialProvider)
   server.startup()
@@ -546,7 +546,7 @@ class SocketServerTest extends JUnitSuite {
       val request = receiveRequest(channel)
 
       val requestMetrics = channel.metrics(request.header.apiKey.name)
-      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.count
+      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.getCount
       val expectedTotalTimeCount = totalTimeHistCount() + 1
 
       // send a large buffer to ensure that the broker detects the client disconnection while writing to the socket channel.
@@ -635,7 +635,7 @@ class SocketServerTest extends JUnitSuite {
         s"Idle connection `${request.context.connectionId}` was not closed by selector")
 
       val requestMetrics = channel.metrics(request.header.apiKey.name)
-      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.count
+      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.getCount
       val expectedTotalTimeCount = totalTimeHistCount() + 1
 
       processRequest(channel, request)
@@ -648,20 +648,31 @@ class SocketServerTest extends JUnitSuite {
     }
   }
 
+  private def extractType(metricName: String): String = {
+    val pattern = ".*\\.\\{type=([^}]*)\\}.*".r
+    val pattern(aType) = metricName
+    aType
+  }
+
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
+  }
+
   @Test
   def testRequestMetricsAfterStop(): Unit = {
     server.stopProcessingRequests()
 
     server.requestChannel.metrics(ApiKeys.PRODUCE.name).requestRate.mark()
     server.requestChannel.updateErrorMetrics(ApiKeys.PRODUCE, Map(Errors.NONE -> 1))
-    val nonZeroMeters = Map("kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce" -> 1,
-        "kafka.network:type=RequestMetrics,name=ErrorsPerSec,request=Produce,error=NONE" -> 1)
+    val nonZeroMeters = Map("kafka.network.{type=RequestMetrics}.{name=RequestsPerSec}.{request=Produce}" -> 1,
+        "kafka.network.{type=RequestMetrics}.{name=ErrorsPerSec}.{error=NONE}.{request=Produce}" -> 1)
 
-    def requestMetricMeters = YammerMetrics
-      .defaultRegistry
-      .allMetrics.asScala
-      .filterKeys(k => k.getType == "RequestMetrics")
-      .collect { case (k, metric: Meter) => (k.toString, metric.count) }
+    def requestMetricMeters = SharedMetricRegistries.getOrCreate("default")
+      .getMetrics.asScala
+      .filterKeys(k => extractType(k) == "RequestMetrics")
+      .collect { case (k, metric: Meter) => (k.toString, metric.getCount) }
 
     assertEquals(nonZeroMeters, requestMetricMeters.filter { case (_, value) => value != 0 })
     server.shutdown()
@@ -672,11 +683,10 @@ class SocketServerTest extends JUnitSuite {
   def testMetricCollectionAfterShutdown(): Unit = {
     server.shutdown()
 
-    val nonZeroMetricNamesAndValues = YammerMetrics
-      .defaultRegistry
-      .allMetrics.asScala
-      .filterKeys(k => k.getName.endsWith("IdlePercent") || k.getName.endsWith("NetworkProcessorAvgIdlePercent"))
-      .collect { case (k, metric: Gauge[_]) => (k, metric.value().asInstanceOf[Double]) }
+    val nonZeroMetricNamesAndValues = SharedMetricRegistries.getOrCreate("default")
+      .getMetrics.asScala
+      .filterKeys(k => extractName(k).endsWith("IdlePercent") || extractName(k).endsWith("NetworkProcessorAvgIdlePercent"))
+      .collect { case (k, metric: Gauge[_]) => (k, metric.getValue.asInstanceOf[Double]) }
       .filter { case (_, value) => value != 0.0 }
 
     assertEquals(Map.empty, nonZeroMetricNamesAndValues)
@@ -693,13 +703,13 @@ class SocketServerTest extends JUnitSuite {
     }
 
     // legacy metrics not tagged
-    val yammerMetricsNames = YammerMetrics.defaultRegistry.allMetrics.asScala
-      .filterKeys(_.getType.equals("Processor"))
+    val dropwizardMetricsNames = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
+      .filterKeys(extractType(_).equals("Processor"))
       .collect { case (k, _: Gauge[_]) => k }
-    assertFalse(yammerMetricsNames.isEmpty)
+    assertFalse(dropwizardMetricsNames.isEmpty)
 
-    yammerMetricsNames.foreach { yammerMetricName =>
-      assertFalse(yammerMetricName.getMBeanName.contains("listener="))
+    dropwizardMetricsNames.foreach { dropwizardMetricName =>
+      assertFalse(dropwizardMetricName.contains("listener="))
     }
   }
 

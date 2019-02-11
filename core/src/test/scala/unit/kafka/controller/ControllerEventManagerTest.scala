@@ -20,8 +20,8 @@ package kafka.controller
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.Timer
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Timer
 import kafka.utils.TestUtils
 import org.junit.{After, Test}
 import org.junit.Assert.{assertEquals, fail}
@@ -40,13 +40,13 @@ class ControllerEventManagerTest {
 
   @Test
   def testSuccessfulEvent(): Unit = {
-    check("kafka.controller:type=ControllerStats,name=AutoLeaderBalanceRateAndTimeMs", ControllerState.AutoLeaderBalance,
+    check("kafka.controller.{type=ControllerStats}.{name=AutoLeaderBalanceRateAndTimeMs}", ControllerState.AutoLeaderBalance,
       () => Unit)
   }
 
   @Test
   def testEventThatThrowsException(): Unit = {
-    check("kafka.controller:type=ControllerStats,name=LeaderElectionRateAndTimeMs", ControllerState.BrokerChange,
+    check("kafka.controller.{type=ControllerStats}.{name=LeaderElectionRateAndTimeMs}", ControllerState.BrokerChange,
       () => throw new NullPointerException)
   }
 
@@ -57,7 +57,7 @@ class ControllerEventManagerTest {
       _ => eventProcessedListenerCount.incrementAndGet)
     controllerEventManager.start()
 
-    val initialTimerCount = timer(metricName).count
+    val initialTimerCount = timer(metricName).getCount
 
     // Only return from `process()` once we have checked `controllerEventManager.state`
     val latch = new CountDownLatch(1)
@@ -75,11 +75,11 @@ class ControllerEventManagerTest {
       "Controller state has not changed back to Idle")
     assertEquals(1, eventProcessedListenerCount.get)
 
-    assertEquals("Timer has not been updated", initialTimerCount + 1, timer(metricName).count)
+    assertEquals("Timer has not been updated", initialTimerCount + 1, timer(metricName).getCount)
   }
 
   private def timer(metricName: String): Timer = {
-    Metrics.defaultRegistry.allMetrics.asScala.filterKeys(_.getMBeanName == metricName).values.headOption
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.filterKeys(_ == metricName).values.headOption
       .getOrElse(fail(s"Unable to find metric $metricName")).asInstanceOf[Timer]
   }
 
