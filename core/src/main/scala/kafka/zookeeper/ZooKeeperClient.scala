@@ -21,7 +21,7 @@ import java.util.Locale
 import java.util.concurrent.locks.{ReentrantLock, ReentrantReadWriteLock}
 import java.util.concurrent.{ArrayBlockingQueue, ConcurrentHashMap, CountDownLatch, Semaphore, TimeUnit}
 
-import com.yammer.metrics.core.{Gauge, MetricName}
+import com.codahale.metrics.Gauge
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils.CoreUtils.{inLock, inReadLock, inWriteLock}
 import kafka.utils.{KafkaScheduler, Logging}
@@ -86,7 +86,7 @@ class ZooKeeperClient(connectString: String,
   @volatile private var zooKeeper = new ZooKeeper(connectString, sessionTimeoutMs, ZooKeeperClientWatcher)
 
   newGauge("SessionState", new Gauge[String] {
-    override def value: String = Option(connectionState.toString).getOrElse("DISCONNECTED")
+    override def getValue: String = Option(connectionState.toString).getOrElse("DISCONNECTED")
   })
 
   metricNames += "SessionState"
@@ -94,7 +94,7 @@ class ZooKeeperClient(connectString: String,
   expiryScheduler.startup()
   waitUntilConnected(connectionTimeoutMs, TimeUnit.MILLISECONDS)
 
-  override def metricName(name: String, metricTags: scala.collection.Map[String, String]): MetricName = {
+  override def metricName(name: String, metricTags: scala.collection.Map[String, String]): String = {
     explicitMetricName(metricGroup, metricType, name, metricTags)
   }
 

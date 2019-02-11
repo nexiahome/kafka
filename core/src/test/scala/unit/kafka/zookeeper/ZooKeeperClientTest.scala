@@ -22,8 +22,8 @@ import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.{ArrayBlockingQueue, ConcurrentLinkedQueue, CountDownLatch, Executors, Semaphore, TimeUnit}
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.{Gauge, Meter, MetricName}
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.{Gauge, Meter}
 import kafka.zk.ZooKeeperTestHarness
 import org.apache.kafka.common.security.JaasUtils
 import org.apache.kafka.common.utils.Time
@@ -586,16 +586,16 @@ class ZooKeeperClientTest extends ZooKeeperTestHarness {
     }
   }
 
-  def isExpectedMetricName(metricName: MetricName, name: String): Boolean =
-    metricName.getName == name && metricName.getGroup == "testMetricGroup" && metricName.getType == "testMetricType"
+  def isExpectedMetricName(metricName: String, name: String): Boolean =
+    metricName.contains(s"testMetricGroup.{type=testMetricType}.{name=$name}")
 
   @Test
   def testZooKeeperStateChangeRateMetrics() {
     def checkMeterCount(name: String, expected: Long) {
-      val meter = Metrics.defaultRegistry.allMetrics.asScala.collectFirst {
+      val meter = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.collectFirst {
         case (metricName, meter: Meter) if isExpectedMetricName(metricName, name) => meter
       }.getOrElse(sys.error(s"Unable to find meter with name $name"))
-      assertEquals(s"Unexpected meter count for $name", expected, meter.count)
+      assertEquals(s"Unexpected meter count for $name", expected, meter.getCount)
     }
 
     val expiresPerSecName = "ZooKeeperExpiresPerSec"
@@ -615,8 +615,8 @@ class ZooKeeperClientTest extends ZooKeeperTestHarness {
   @Test
   def testZooKeeperSessionStateMetric(): Unit = {
     def gaugeValue(name: String): Option[String] = {
-      Metrics.defaultRegistry.allMetrics.asScala.collectFirst {
-        case (metricName, gauge: Gauge[_]) if isExpectedMetricName(metricName, name) => gauge.value.asInstanceOf[String]
+      SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.collectFirst {
+        case (metricName, gauge: Gauge[_]) if isExpectedMetricName(metricName, name) => gauge.getValue.asInstanceOf[String]
       }
     }
 
@@ -630,8 +630,8 @@ class ZooKeeperClientTest extends ZooKeeperTestHarness {
   }
 
   private def cleanMetricsRegistry() {
-    val metrics = Metrics.defaultRegistry
-    metrics.allMetrics.keySet.asScala.foreach(metrics.removeMetric)
+    val metrics = SharedMetricRegistries.getOrCreate("default")
+    metrics.getNames.asScala.foreach(metrics.remove)
   }
 
   private def bytes = UUID.randomUUID().toString.getBytes(StandardCharsets.UTF_8)
