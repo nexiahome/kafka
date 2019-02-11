@@ -62,7 +62,6 @@ class ProducerBounceTest extends KafkaServerTestHarness {
   /**
    * With replication, producer should able to find new leader after it detects broker failure
    */
-  @Ignore // To be re-enabled once we can make it less flaky (KAFKA-2837)
   @Test
   def testBrokerFailure() {
     val numPartitions = 3
