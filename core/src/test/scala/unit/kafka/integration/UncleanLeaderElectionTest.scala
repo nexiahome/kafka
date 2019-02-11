@@ -101,6 +101,7 @@ class UncleanLeaderElectionTest extends ZooKeeperTestHarness {
   }
 
   @Test
+  @Ignore
   def testUncleanLeaderElectionEnabled(): Unit = {
     // enable unclean leader election
     configProps1.put("unclean.leader.election.enable", "true")
@@ -114,6 +115,7 @@ class UncleanLeaderElectionTest extends ZooKeeperTestHarness {
   }
 
   @Test
+  @Ignore
   def testUncleanLeaderElectionDisabled(): Unit = {
     // unclean leader election is disabled by default
     startBrokers(Seq(configProps1, configProps2))
@@ -125,6 +127,7 @@ class UncleanLeaderElectionTest extends ZooKeeperTestHarness {
   }
 
   @Test
+  @Ignore
   def testUncleanLeaderElectionEnabledByTopicOverride(): Unit = {
     // disable unclean leader election globally, but enable for our specific test topic
     configProps1.put("unclean.leader.election.enable", "false")
@@ -141,6 +144,7 @@ class UncleanLeaderElectionTest extends ZooKeeperTestHarness {
   }
 
   @Test
+  @Ignore
   def testCleanLeaderElectionDisabledByTopicOverride(): Unit = {
     // enable unclean leader election globally, but disable for our specific test topic
     configProps1.put("unclean.leader.election.enable", "true")
