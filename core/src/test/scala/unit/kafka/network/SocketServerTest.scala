@@ -667,7 +667,7 @@ class SocketServerTest extends JUnitSuite {
     server.requestChannel.metrics(ApiKeys.PRODUCE.name).requestRate.mark()
     server.requestChannel.updateErrorMetrics(ApiKeys.PRODUCE, Map(Errors.NONE -> 1))
     val nonZeroMeters = Map("kafka.network.{type=RequestMetrics}.{name=RequestsPerSec}.{request=Produce}" -> 1,
-        "kafka.network.{type=RequestMetrics}.{name=ErrorsPerSec}.{request=Produce}.{error=NONE}" -> 1)
+        "kafka.network.{type=RequestMetrics}.{name=ErrorsPerSec}.{error=NONE}.{request=Produce}" -> 1)
 
     def requestMetricMeters = SharedMetricRegistries.getOrCreate("default")
       .getMetrics.asScala

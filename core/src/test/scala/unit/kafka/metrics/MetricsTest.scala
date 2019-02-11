@@ -61,11 +61,11 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     //this assertion is only used for creating the metrics for DelayedFetchMetrics, it should never fail, but should not be removed
     assertNotNull(DelayedFetchMetrics)
 
-    val countOfStaticMetrics = SharedMetricRegistries.getOrCreate("default").getNames.size
+    val staticMetricNames = SharedMetricRegistries.getOrCreate("default").getNames
 
     for (i <- 0 to 5) {
       createAndShutdownStep(topic, "group" + i % 3, "consumer" + i % 2, "producer" + i % 2)
-      assertEquals(countOfStaticMetrics, SharedMetricRegistries.getOrCreate("default").getNames.size)
+      assertEquals(staticMetricNames, SharedMetricRegistries.getOrCreate("default").getNames)
     }
   }
 
@@ -125,8 +125,8 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     val topic = "test-bytes-in-out"
     val replicationBytesIn = BrokerTopicStats.ReplicationBytesInPerSec
     val replicationBytesOut = BrokerTopicStats.ReplicationBytesOutPerSec
-    val bytesIn = s"${BrokerTopicStats.BytesInPerSec},topic=$topic"
-    val bytesOut = s"${BrokerTopicStats.BytesOutPerSec},topic=$topic"
+    val bytesIn = s"${BrokerTopicStats.BytesInPerSec}"
+    val bytesOut = s"${BrokerTopicStats.BytesOutPerSec}"
 
     val topicConfig = new Properties
     topicConfig.setProperty(LogConfig.MinInSyncReplicasProp, "2")
@@ -147,22 +147,22 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
 
     val initialReplicationBytesIn = meterCount(replicationBytesIn)
     val initialReplicationBytesOut = meterCount(replicationBytesOut)
-    val initialBytesIn = meterCount(bytesIn)
-    val initialBytesOut = meterCount(bytesOut)
+    val initialBytesIn = topicMeterCount(bytesIn, topic)
+    val initialBytesOut = topicMeterCount(bytesOut, topic)
 
     // Produce a few messages to make the metrics tick
     TestUtils.produceMessages(servers, topic, nMessages)
 
     assertTrue(meterCount(replicationBytesIn) > initialReplicationBytesIn)
     assertTrue(meterCount(replicationBytesOut) > initialReplicationBytesOut)
-    assertTrue(meterCount(bytesIn) > initialBytesIn)
+    assertTrue(topicMeterCount(bytesIn, topic) > initialBytesIn)
     // BytesOut doesn't include replication, so it shouldn't have changed
-    assertEquals(initialBytesOut, meterCount(bytesOut))
+    assertEquals(initialBytesOut, topicMeterCount(bytesOut, topic))
 
     // Consume messages to make bytesOut tick
     TestUtils.consumeTopicRecords(servers, topic, nMessages * 2)
 
-    assertTrue(meterCount(bytesOut) > initialBytesOut)
+    assertTrue(topicMeterCount(bytesOut, topic) > initialBytesOut)
   }
 
   @Test
@@ -195,9 +195,15 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     name
   }
 
+  private def extractTopic(metricName: String): String = {
+    val pattern = ".*\\.\\{topic=([^}]*)\\}.*".r
+    val pattern(topic) = metricName
+    topic
+  }
+
   private def meterCount(metricName: String): Long = {
     SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
-      .filterKeys(extractName(_).endsWith(metricName))
+      .filterKeys(extractName(_).equals(metricName))
       .values
       .headOption
       .getOrElse(fail(s"Unable to find metric $metricName"))
@@ -205,8 +211,19 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
       .getCount
   }
 
+  private def topicMeterCount(metricName: String, topic: String): Long = {
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
+      .filterKeys(extractName(_).equals(metricName))
+      .filterKeys(extractTopic(_).equals(topic))
+      .values
+      .headOption
+      .getOrElse(fail(s"Unable to find metric $metricName for topic $topic"))
+      .asInstanceOf[Meter]
+      .getCount
+  }
+
   private def topicMetrics(topic: String): Set[String] = {
-    val topicMetricRegex = new Regex(".*BrokerTopicMetrics.*\\.{topic=" + topic + "}")
+    val topicMetricRegex = new Regex(".*BrokerTopicMetrics.*\\.\\{topic=" + topic + "\\}")
     val metrics = SharedMetricRegistries.getOrCreate("default").getMetrics.keySet.asScala
     metrics.filter(topicMetricRegex.pattern.matcher(_).matches)
   }

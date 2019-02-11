@@ -190,18 +190,18 @@ class MetricsTest extends IntegrationTestHarness with SaslSetup {
   }
 
   private def verifyBrokerMessageConversionMetrics(server: KafkaServer, recordSize: Int, tp: TopicPartition): Unit = {
-    val requestMetricsPrefix = "kafka.network:type=RequestMetrics"
-    val requestBytes = verifyDropwizardMetricRecorded(s"$requestMetricsPrefix,name=RequestBytes,request=Produce")
-    val tempBytes = verifyDropwizardMetricRecorded(s"$requestMetricsPrefix,name=TemporaryMemoryBytes,request=Produce")
+    val requestMetricsPrefix = "kafka.network.{type=RequestMetrics}"
+    val requestBytes = verifyDropwizardMetricRecorded(s"$requestMetricsPrefix.{name=RequestBytes}.{request=Produce}")
+    val tempBytes = verifyDropwizardMetricRecorded(s"$requestMetricsPrefix.{name=TemporaryMemoryBytes}.{request=Produce}")
     assertTrue(s"Unexpected temporary memory size requestBytes $requestBytes tempBytes $tempBytes",
         tempBytes >= recordSize)
 
-    verifyDropwizardMetricRecorded(s"kafka.server:type=BrokerTopicMetrics,name=ProduceMessageConversionsPerSec")
+    verifyDropwizardMetricRecorded(s"kafka.server.{type=BrokerTopicMetrics}.{name=ProduceMessageConversionsPerSec}")
 
     // Conversion time less than 1 millisecond is reported as zero, so retry with larger batches until time > 0
     var iteration = 0
     TestUtils.retry(5000) {
-      val conversionTimeMs = dropwizardMetricValue(s"$requestMetricsPrefix,name=MessageConversionsTimeMs,request=Produce").asInstanceOf[Double]
+      val conversionTimeMs = dropwizardMetricValue(s"$requestMetricsPrefix.{name=MessageConversionsTimeMs}.{request=Produce}").asInstanceOf[Long].toDouble
       if (conversionTimeMs <= 0.0) {
         iteration += 1
         sendRecords(producers.head, 1000 * iteration, 100, tp)
@@ -209,15 +209,15 @@ class MetricsTest extends IntegrationTestHarness with SaslSetup {
       assertTrue(s"Message conversion time not recorded $conversionTimeMs", conversionTimeMs > 0.0)
     }
 
-    verifyDropwizardMetricRecorded(s"$requestMetricsPrefix,name=RequestBytes,request=Fetch")
-    verifyDropwizardMetricRecorded(s"$requestMetricsPrefix,name=TemporaryMemoryBytes,request=Fetch", value => value == 0.0)
+    verifyDropwizardMetricRecorded(s"$requestMetricsPrefix.{name=RequestBytes}.{request=Fetch}")
+    verifyDropwizardMetricRecorded(s"$requestMetricsPrefix.{name=TemporaryMemoryBytes}.{request=Fetch}", value => value == 0.0)
 
      // request size recorded for all request types, check one
-    verifyDropwizardMetricRecorded(s"$requestMetricsPrefix,name=RequestBytes,request=Metadata")
+    verifyDropwizardMetricRecorded(s"$requestMetricsPrefix.{name=RequestBytes}.{request=Metadata}")
   }
 
   private def verifyBrokerZkMetrics(server: KafkaServer, topic: String): Unit = {
-    val histogram = dropwizardHistogram("kafka.server:type=ZooKeeperClientMetrics,name=ZooKeeperRequestLatencyMs")
+    val histogram = dropwizardHistogram("kafka.server.{type=ZooKeeperClientMetrics}.{name=ZooKeeperRequestLatencyMs}")
     // Latency is rounded to milliseconds, so check the count instead
     val initialCount = histogram.getCount
     servers.head.zkClient.getLeaderForPartition(new TopicPartition(topic, 0))
@@ -241,15 +241,15 @@ class MetricsTest extends IntegrationTestHarness with SaslSetup {
     def errorMetricCount = SharedMetricRegistries.getOrCreate("default").getNames.asScala.filter(extractName(_) == "ErrorsPerSec").size
 
     val startErrorMetricCount = errorMetricCount
-    val errorMetricPrefix = "kafka.network:type=RequestMetrics,name=ErrorsPerSec"
-    verifyDropwizardMetricRecorded(s"$errorMetricPrefix,request=Metadata,error=NONE")
+    val errorMetricPrefix = "kafka.network.{type=RequestMetrics}.{name=ErrorsPerSec}"
+    verifyDropwizardMetricRecorded(s"$errorMetricPrefix.{error=NONE}.{request=Metadata}")
 
     try {
       consumers.head.partitionsFor("12{}!")
     } catch {
       case _: InvalidTopicException => // expected
     }
-    verifyDropwizardMetricRecorded(s"$errorMetricPrefix,request=Metadata,error=INVALID_TOPIC_EXCEPTION")
+    verifyDropwizardMetricRecorded(s"$errorMetricPrefix.{error=INVALID_TOPIC_EXCEPTION}.{request=Metadata}")
 
     // Check that error metrics are registered dynamically
     val currentErrorMetricCount = errorMetricCount
@@ -258,7 +258,7 @@ class MetricsTest extends IntegrationTestHarness with SaslSetup {
 
     // Verify that error metric is updated with producer acks=0 when no response is sent
     sendRecords(producers.head, 1, 100, new TopicPartition("non-existent", 0))
-    verifyDropwizardMetricRecorded(s"$errorMetricPrefix,request=Metadata,error=LEADER_NOT_AVAILABLE")
+    verifyDropwizardMetricRecorded(s"$errorMetricPrefix.{error=LEADER_NOT_AVAILABLE}.{request=Metadata}")
   }
 
   private def verifyKafkaMetric[T](name: String, metrics: java.util.Map[MetricName, _ <: Metric], entity: String,
@@ -286,7 +286,7 @@ class MetricsTest extends IntegrationTestHarness with SaslSetup {
 
   private def dropwizardMetricValue(name: String): Any = {
     val allMetrics = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
-    val (_, metric) = allMetrics.find { case (n, _) => n.contains(".{name=" + name + "}") }
+    val (_, metric) = allMetrics.find { case (n, _) => n.contains(name) }
       .getOrElse(fail(s"Unable to find broker metric $name: allMetrics: ${allMetrics.keySet}"))
     metric match {
       case m: Meter => m.getCount.toDouble
@@ -298,7 +298,7 @@ class MetricsTest extends IntegrationTestHarness with SaslSetup {
 
   private def dropwizardHistogram(name: String): Histogram = {
     val allMetrics = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
-    val (_, metric) = allMetrics.find { case (n, _) => n.contains(".{name=" + name + "}") }
+    val (_, metric) = allMetrics.find { case (n, _) => n.contains(name) }
       .getOrElse(fail(s"Unable to find broker metric $name: allMetrics: ${allMetrics.keySet}"))
     metric match {
       case m: Histogram => m
@@ -307,7 +307,13 @@ class MetricsTest extends IntegrationTestHarness with SaslSetup {
   }
 
   private def verifyDropwizardMetricRecorded(name: String, verify: Double => Boolean = d => d > 0): Double = {
-    val metricValue = dropwizardMetricValue(name).asInstanceOf[Double]
+    val metricRawValue = dropwizardMetricValue(name)
+    val metricValue = metricRawValue match {
+      case m: Double => m
+      case m: Long => m.toDouble
+      case m: Int => m.toDouble
+      case m => fail(s"Unexpected gauge metric of class ${m.getClass}")
+    }
     assertTrue(s"Broker metric not recorded correctly for $name value $metricValue", verify(metricValue))
     metricValue
   }

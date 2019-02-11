@@ -140,7 +140,8 @@ object KafkaMetricsGroup extends KafkaMetricsGroup with Logging {
      * metric for SyncProducer in fetchTopicMetaData() needs to be removed when consumer is closed.
      */
     explicitMetricName("kafka.producer", "ProducerRequestMetrics", "ProducerRequestRateAndTimeMs"),
-    explicitMetricName("kafka.producer", "ProducerRequestMetrics", "ProducerRequestSize")
+    explicitMetricName("kafka.producer", "ProducerRequestMetrics", "ProducerRequestSize"),
+    explicitMetricName("kafka.producer", "ProducerRequestMetrics", "ProducerRequestThrottleRateAndTimeMs")
   )
 
   private val producerMetricNameList: immutable.List[String] = immutable.List[String](
@@ -191,6 +192,7 @@ object KafkaMetricsGroup extends KafkaMetricsGroup with Logging {
   private def removeAllMetricsInList(metricNameList: immutable.List[String], clientId: String) {
     metricNameList.foreach(metric => {
       val pattern = (Pattern.quote(metric) + ".*\\.\\{clientId=" + Pattern.quote(clientId) + "\\}.*").r
+      trace("Removing pattern %s".format(pattern))
       val registeredMetrics = SharedMetricRegistries.getOrCreate("default").getNames().asScala
       for (registeredMetric <- registeredMetrics) {
         pattern.findFirstIn(registeredMetric) match {
