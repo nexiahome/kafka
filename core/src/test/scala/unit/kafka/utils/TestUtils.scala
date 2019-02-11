@@ -1113,8 +1113,11 @@ object TestUtils extends Logging {
       TestUtils.getBrokerListStrFromServers(servers),
       retries = 5
     )
-    producer.send(new ProducerRecord(topic, topic.getBytes, message.getBytes)).get
-    producer.close()
+    try {
+      producer.send(new ProducerRecord(topic, topic.getBytes, message.getBytes)).get
+    } finally {
+      producer.close()
+    }
   }
 
   /**
