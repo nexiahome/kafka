@@ -19,8 +19,8 @@ package kafka.log
 
 import java.io.PrintWriter
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Gauge
 import kafka.utils.{MockTime, TestUtils}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.test.TestUtils.DEFAULT_MAX_WAIT_MS
@@ -61,9 +61,9 @@ class LogCleanerIntegrationTest extends AbstractLogCleanerIntegrationTest {
     }
 
     def getGauge[T](metricName: String, metricScope: String): Gauge[T] = {
-      Metrics.defaultRegistry.allMetrics.asScala
+      SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
         .filterKeys(k => {
-          k.getName.endsWith(metricName) && k.getScope.endsWith(metricScope)
+          k.endsWith(s".{name=$metricName}.{logDirectory=${'"'}$metricScope${'"'}}")
         })
         .headOption
         .getOrElse { fail(s"Unable to find metric $metricName") }
@@ -83,10 +83,10 @@ class LogCleanerIntegrationTest extends AbstractLogCleanerIntegrationTest {
     val uncleanablePartitionsCountGauge = getGauge[Int]("uncleanable-partitions-count", uncleanableDirectory)
     val uncleanableBytesGauge = getGauge[Long]("uncleanable-bytes", uncleanableDirectory)
 
-    TestUtils.waitUntilTrue(() => uncleanablePartitionsCountGauge.value() == 2, "There should be 2 uncleanable partitions", 2000L)
+    TestUtils.waitUntilTrue(() => uncleanablePartitionsCountGauge.getValue() == 2, "There should be 2 uncleanable partitions", 2000L)
     val expectedTotalUncleanableBytes = LogCleaner.calculateCleanableBytes(log, 0, log.logSegments.last.baseOffset)._2 +
       LogCleaner.calculateCleanableBytes(log2, 0, log2.logSegments.last.baseOffset)._2
-    TestUtils.waitUntilTrue(() => uncleanableBytesGauge.value() == expectedTotalUncleanableBytes,
+    TestUtils.waitUntilTrue(() => uncleanableBytesGauge.getValue() == expectedTotalUncleanableBytes,
       s"There should be $expectedTotalUncleanableBytes uncleanable bytes", 1000L)
 
     val uncleanablePartitions = cleaner.cleanerManager.uncleanablePartitions(uncleanableDirectory)

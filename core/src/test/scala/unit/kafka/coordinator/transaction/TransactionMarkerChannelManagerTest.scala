@@ -29,7 +29,7 @@ import org.apache.kafka.common.{Node, TopicPartition}
 import org.easymock.{Capture, EasyMock, IAnswer}
 import org.junit.Assert._
 import org.junit.Test
-import com.yammer.metrics.Metrics
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.common.RequestAndCompletionHandler
 import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 
@@ -431,13 +431,13 @@ class TransactionMarkerChannelManagerTest {
 
   @Test
   def shouldCreateMetricsOnStarting(): Unit = {
-    val metrics = Metrics.defaultRegistry.allMetrics.asScala
+    val metrics = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
 
     assertEquals(1, metrics
-      .filterKeys(_.getMBeanName == "kafka.coordinator.transaction:type=TransactionMarkerChannelManager,name=UnknownDestinationQueueSize")
+      .filterKeys(_ == "kafka.coordinator.transaction.{type=TransactionMarkerChannelManager}.{name=UnknownDestinationQueueSize}")
       .size)
     assertEquals(1, metrics
-      .filterKeys(_.getMBeanName == "kafka.coordinator.transaction:type=TransactionMarkerChannelManager,name=LogAppendRetryQueueSize")
+      .filterKeys(_ == "kafka.coordinator.transaction.{type=TransactionMarkerChannelManager}.{name=LogAppendRetryQueueSize}")
       .size)
   }
 }

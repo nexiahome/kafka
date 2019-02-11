@@ -21,7 +21,7 @@ import java.nio.ByteBuffer
 import java.util.Optional
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.yammer.metrics.Metrics
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.cluster.BrokerEndPoint
 import kafka.log.LogAppendInfo
 import kafka.message.NoCompressionCodec
@@ -52,11 +52,17 @@ class AbstractFetcherThreadTest {
 
   @Before
   def cleanMetricRegistry(): Unit = {
-    for (metricName <- Metrics.defaultRegistry().allMetrics().keySet().asScala)
-      Metrics.defaultRegistry().removeMetric(metricName)
+    for (metricName <- SharedMetricRegistries.getOrCreate("default").getNames.asScala)
+      SharedMetricRegistries.getOrCreate("default").remove(metricName)
   }
 
-  private def allMetricsNames: Set[String] = Metrics.defaultRegistry().allMetrics().asScala.keySet.map(_.getName)
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
+  }
+
+  private def allMetricsNames: Set[String] = SharedMetricRegistries.getOrCreate("default").getNames.asScala.map(extractName(_))
 
   private def mkBatch(baseOffset: Long, leaderEpoch: Int, records: SimpleRecord*): RecordBatch = {
     MemoryRecords.withRecords(baseOffset, CompressionType.NONE, leaderEpoch, records: _*)
@@ -87,7 +93,7 @@ class AbstractFetcherThreadTest {
     fetcher.shutdown()
 
     // after shutdown, they should be gone
-    assertTrue(Metrics.defaultRegistry().allMetrics().isEmpty)
+    assertTrue(SharedMetricRegistries.getOrCreate("default").getNames.isEmpty)
   }
 
   @Test

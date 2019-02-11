@@ -19,7 +19,7 @@ package kafka.controller
 import java.net.SocketTimeoutException
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue, TimeUnit}
 
-import com.yammer.metrics.core.{Gauge, Timer}
+import com.codahale.metrics.{Gauge, Timer}
 import kafka.api._
 import kafka.cluster.Broker
 import kafka.metrics.KafkaMetricsGroup
@@ -60,7 +60,7 @@ class ControllerChannelManager(controllerContext: ControllerContext,
   newGauge(
     "TotalQueueSize",
     new Gauge[Int] {
-      def value: Int = brokerLock synchronized {
+      def getValue: Int = brokerLock synchronized {
         brokerStateInfo.values.iterator.map(_.messageQueue.size).sum
       }
     }
@@ -177,7 +177,7 @@ class ControllerChannelManager(controllerContext: ControllerContext,
     val queueSizeGauge = newGauge(
       QueueSizeMetricName,
       new Gauge[Int] {
-        def value: Int = messageQueue.size
+        def getValue: Int = messageQueue.size
       },
       brokerMetricTags(broker.id)
     )

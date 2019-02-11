@@ -684,6 +684,12 @@ project(':core') {
     compile libs.jacksonJDK8Datatypes
     compile libs.joptSimple
     compile libs.metrics
+    compile libs.akkaActor
+    compile libs.akkaStream
+    compile libs.akkaHttp
+    compile libs.prometheus
+    compile libs.prometheusHotspot
+    compile libs.prometheusAkkaHttp
     compile libs.scalaLibrary
     // only needed transitively, but set it explicitly to ensure it has the same version as scala-library
     compile libs.scalaReflect

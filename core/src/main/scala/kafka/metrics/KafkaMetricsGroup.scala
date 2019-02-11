@@ -19,21 +19,21 @@ package kafka.metrics
 
 import java.util.concurrent.TimeUnit
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.{Gauge, MetricName}
+import com.codahale.metrics.Gauge
+import com.codahale.metrics.MetricRegistry
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.utils.Logging
 import org.apache.kafka.common.utils.Sanitizer
 
 trait KafkaMetricsGroup extends Logging {
 
   /**
-   * Creates a new MetricName object for gauges, meters, etc. created for this
-   * metrics group.
+   * Creates a new String name for gauges, meters, etc. created for this metrics group.
    * @param name Descriptive name of the metric.
    * @param tags Additional attributes which mBean will have.
-   * @return Sanitized metric name object.
+   * @return Sanitized metric name as a String.
    */
-  def metricName(name: String, tags: scala.collection.Map[String, String]): MetricName = {
+  def metricName(name: String, tags: scala.collection.Map[String, String]): String = {
     val klass = this.getClass
     val pkg = if (klass.getPackage == null) "" else klass.getPackage.getName
     val simpleName = klass.getSimpleName.replaceAll("\\$$", "")
@@ -43,66 +43,61 @@ trait KafkaMetricsGroup extends Logging {
 
 
   protected def explicitMetricName(group: String, typeName: String, name: String,
-                                   tags: scala.collection.Map[String, String]): MetricName = {
+                                   tags: scala.collection.Map[String, String] = Map.empty): String = {
 
     val nameBuilder: StringBuilder = new StringBuilder
 
     nameBuilder.append(group)
 
-    nameBuilder.append(":type=")
-
-    nameBuilder.append(typeName)
+    nameBuilder.append(".{type=").append(typeName).append("}")
 
     if (name.length > 0) {
-      nameBuilder.append(",name=")
-      nameBuilder.append(name)
+      nameBuilder.append(".{name=").append(name).append("}")
     }
 
-    val scope: String = toScope(tags).getOrElse(null)
-    val tagsName = toMBeanName(tags)
-    tagsName.foreach(nameBuilder.append(",").append(_))
+    nameBuilder.append(KafkaMetricsGroup.toTagSuffix(tags))
 
-    new MetricName(group, typeName, name, scope, nameBuilder.toString)
+    MetricRegistry.name(nameBuilder.toString)
   }
 
-  def newGauge[T](name: String, metric: Gauge[T], tags: scala.collection.Map[String, String] = Map.empty) =
-    Metrics.defaultRegistry().newGauge(metricName(name, tags), metric)
+  def newGauge[T](name: String, metric: Gauge[T], tags: scala.collection.Map[String, String] = Map.empty) = {
+    val registry = SharedMetricRegistries.getOrCreate("default")
+    val fullName = metricName(name, tags)
+    val supplier: MetricRegistry.MetricSupplier[Gauge[_]] = new MetricRegistry.MetricSupplier[Gauge[_]] {
+      override def newMetric(): Gauge[T] = metric
+    }
+    registry.gauge(fullName, supplier).asInstanceOf[Gauge[T]]
+  }
 
-  def newMeter(name: String, eventType: String, timeUnit: TimeUnit, tags: scala.collection.Map[String, String] = Map.empty) =
-    Metrics.defaultRegistry().newMeter(metricName(name, tags), eventType, timeUnit)
+  def newMeter(name: String, eventType: String, timeUnit: TimeUnit, tags: scala.collection.Map[String, String] = Map.empty) = {
+    val registry = SharedMetricRegistries.getOrCreate("default")
+    val fullName = metricName(name, tags)
+    registry.meter(fullName)
+  }
 
-  def newHistogram(name: String, biased: Boolean = true, tags: scala.collection.Map[String, String] = Map.empty) =
-    Metrics.defaultRegistry().newHistogram(metricName(name, tags), biased)
+  def newHistogram(name: String, biased: Boolean = true, tags: scala.collection.Map[String, String] = Map.empty) = {
+    val registry = SharedMetricRegistries.getOrCreate("default")
+    val fullName = metricName(name, tags)
+    registry.histogram(fullName)
+  }
 
-  def newTimer(name: String, durationUnit: TimeUnit, rateUnit: TimeUnit, tags: scala.collection.Map[String, String] = Map.empty) =
-    Metrics.defaultRegistry().newTimer(metricName(name, tags), durationUnit, rateUnit)
+  def newTimer(name: String, durationUnit: TimeUnit, rateUnit: TimeUnit, tags: scala.collection.Map[String, String] = Map.empty) = {
+    val registry = SharedMetricRegistries.getOrCreate("default")
+    val fullName = metricName(name, tags)
+    registry.timer(fullName)
+  }
 
   def removeMetric(name: String, tags: scala.collection.Map[String, String] = Map.empty) =
-    Metrics.defaultRegistry().removeMetric(metricName(name, tags))
-
-  private def toMBeanName(tags: collection.Map[String, String]): Option[String] = {
-    val filteredTags = tags.filter { case (_, tagValue) => tagValue != "" }
-    if (filteredTags.nonEmpty) {
-      val tagsString = filteredTags.map { case (key, value) => "%s=%s".format(key, Sanitizer.jmxSanitize(value)) }.mkString(",")
-      Some(tagsString)
-    }
-    else None
-  }
-
-  private def toScope(tags: collection.Map[String, String]): Option[String] = {
-    val filteredTags = tags.filter { case (_, tagValue) => tagValue != ""}
-    if (filteredTags.nonEmpty) {
-      // convert dot to _ since reporters like Graphite typically use dot to represent hierarchy
-      val tagsString = filteredTags
-        .toList.sortWith((t1, t2) => t1._1 < t2._1)
-        .map { case (key, value) => "%s.%s".format(key, value.replaceAll("\\.", "_"))}
-        .mkString(".")
-
-      Some(tagsString)
-    }
-    else None
-  }
-
+    SharedMetricRegistries.getOrCreate("default").remove(metricName(name, tags))
 }
 
-object KafkaMetricsGroup extends KafkaMetricsGroup
+object KafkaMetricsGroup extends KafkaMetricsGroup {
+  private def toTagSuffix(tags: collection.Map[String, String]): String = {
+    val filteredTags = tags.filter { case (_, tagValue) => tagValue != "" }
+    if (filteredTags.nonEmpty) {
+      val tagsString = filteredTags.toSeq.sortBy(_._1).map { case (key, value) => "{%s=%s}".format(key, Sanitizer.jmxSanitize(value)) }.mkString(".")
+      "." + tagsString
+    }
+    else ""
+  }
+}

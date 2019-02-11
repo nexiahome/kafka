@@ -23,8 +23,8 @@ import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import java.util.{HashMap, Properties, Random}
 
-import com.yammer.metrics.core.{Gauge, Meter}
-import com.yammer.metrics.{Metrics => YammerMetrics}
+import com.codahale.metrics.{Gauge, Meter}
+import com.codahale.metrics.SharedMetricRegistries
 import javax.net.ssl._
 
 import kafka.security.CredentialProvider
@@ -68,8 +68,8 @@ class SocketServerTest {
   val localAddress = InetAddress.getLoopbackAddress
 
   // Clean-up any metrics left around by previous tests
-  for (metricName <- YammerMetrics.defaultRegistry.allMetrics.keySet.asScala)
-    YammerMetrics.defaultRegistry.removeMetric(metricName)
+  for (metricName <- SharedMetricRegistries.getOrCreate("default").getNames.asScala)
+    SharedMetricRegistries.getOrCreate("default").remove(metricName)
 
   val server = new SocketServer(config, metrics, Time.SYSTEM, credentialProvider)
   server.startup()
@@ -185,7 +185,7 @@ class SocketServerTest {
     sendRequest(plainSocket, serializedBytes)
     processRequest(server.dataPlaneRequestChannel)
     assertEquals(serializedBytes.toSeq, receiveResponse(plainSocket).toSeq)
-    verifyAcceptorBlockedPercent("PLAINTEXT", expectBlocked = false)
+    verifyAcceptorBlockedNanoseconds("PLAINTEXT", expectBlocked = false)
   }
 
   @Test
@@ -689,7 +689,7 @@ class SocketServerTest {
       val request = receiveRequest(channel)
 
       val requestMetrics = channel.metrics(request.header.apiKey.name)
-      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.count
+      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.getCount
       val expectedTotalTimeCount = totalTimeHistCount() + 1
 
       // send a large buffer to ensure that the broker detects the client disconnection while writing to the socket channel.
@@ -779,7 +779,7 @@ class SocketServerTest {
         s"Idle connection `${request.context.connectionId}` was not closed by selector")
 
       val requestMetrics = channel.metrics(request.header.apiKey.name)
-      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.count
+      def totalTimeHistCount(): Long = requestMetrics.totalTimeHist.getCount
       val expectedTotalTimeCount = totalTimeHistCount() + 1
 
       processRequest(channel, request)
@@ -792,6 +792,18 @@ class SocketServerTest {
     }
   }
 
+  private def extractType(metricName: String): String = {
+    val pattern = ".*\\.\\{type=([^}]*)\\}.*".r
+    val pattern(aType) = metricName
+    aType
+  }
+
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
+  }
+
   @Test
   def testRequestMetricsAfterStop(): Unit = {
     server.stopProcessingRequests()
@@ -799,17 +811,16 @@ class SocketServerTest {
     val version2 = (version - 1).toShort
     for (_ <- 0 to 1) server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate(version).mark()
     server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate(version2).mark()
-    assertEquals(2, server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate(version).count())
+    assertEquals(2, server.dataPlaneRequestChannel.metrics(ApiKeys.PRODUCE.name).requestRate(version).getCount())
     server.dataPlaneRequestChannel.updateErrorMetrics(ApiKeys.PRODUCE, Map(Errors.NONE -> 1))
-    val nonZeroMeters = Map(s"kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce,version=$version" -> 2,
-        s"kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce,version=$version2" -> 1,
-        "kafka.network:type=RequestMetrics,name=ErrorsPerSec,request=Produce,error=NONE" -> 1)
+    val nonZeroMeters = Map(s"kafka.network.{type=RequestMetrics}.{name=RequestsPerSec}.{request=Produce}.{version=$version}" -> 2,
+        s"kafka.network.{type=RequestMetrics}.{name=RequestsPerSec}.{request=Produce}.{version=$version2}" -> 1,
+        "kafka.network.{type=RequestMetrics}.{name=ErrorsPerSec}.{error=NONE}.{request=Produce}" -> 1)
 
-    def requestMetricMeters = YammerMetrics
-      .defaultRegistry
-      .allMetrics.asScala
-      .filterKeys(k => k.getType == "RequestMetrics")
-      .collect { case (k, metric: Meter) => (k.toString, metric.count) }
+    def requestMetricMeters = SharedMetricRegistries.getOrCreate("default")
+      .getMetrics.asScala
+      .filterKeys(k => extractType(k) == "RequestMetrics")
+      .collect { case (k, metric: Meter) => (k.toString, metric.getCount) }
 
     assertEquals(nonZeroMeters, requestMetricMeters.filter { case (_, value) => value != 0 })
     server.shutdown()
@@ -820,11 +831,10 @@ class SocketServerTest {
   def testMetricCollectionAfterShutdown(): Unit = {
     server.shutdown()
 
-    val nonZeroMetricNamesAndValues = YammerMetrics
-      .defaultRegistry
-      .allMetrics.asScala
-      .filterKeys(k => k.getName.endsWith("IdlePercent") || k.getName.endsWith("NetworkProcessorAvgIdlePercent"))
-      .collect { case (k, metric: Gauge[_]) => (k, metric.value().asInstanceOf[Double]) }
+    val nonZeroMetricNamesAndValues = SharedMetricRegistries.getOrCreate("default")
+      .getMetrics.asScala
+      .filterKeys(k => extractName(k).endsWith("IdlePercent") || extractName(k).endsWith("NetworkProcessorAvgIdlePercent"))
+      .collect { case (k, metric: Gauge[_]) => (k, metric.getValue.asInstanceOf[Double]) }
       .filter { case (_, value) => value != 0.0 && !value.equals(Double.NaN) }
 
     assertEquals(Map.empty, nonZeroMetricNamesAndValues)
@@ -841,13 +851,13 @@ class SocketServerTest {
     }
 
     // legacy metrics not tagged
-    val yammerMetricsNames = YammerMetrics.defaultRegistry.allMetrics.asScala
-      .filterKeys(_.getType.equals("Processor"))
+    val dropwizardMetricsNames = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
+      .filterKeys(extractType(_).equals("Processor"))
       .collect { case (k, _: Gauge[_]) => k }
-    assertFalse(yammerMetricsNames.isEmpty)
+    assertFalse(dropwizardMetricsNames.isEmpty)
 
-    yammerMetricsNames.foreach { yammerMetricName =>
-      assertFalse(yammerMetricName.getMBeanName.contains("listener="))
+    dropwizardMetricsNames.foreach { dropwizardMetricName =>
+      assertFalse(dropwizardMetricName.contains("listener="))
     }
   }
 
@@ -1125,7 +1135,7 @@ class SocketServerTest {
       // we can safely check that there were atleast 4 polls prior to the 5th connection.
       val pollCount = testableSelector.operationCounts(SelectorOperation.Poll)
       assertTrue(s"Connections created too quickly: $pollCount", pollCount >= numConnections - 1)
-      verifyAcceptorBlockedPercent("PLAINTEXT", expectBlocked = true)
+      verifyAcceptorBlockedNanoseconds("PLAINTEXT", expectBlocked = true)
 
       assertProcessorHealthy(testableServer, sockets)
     } finally {
@@ -1175,18 +1185,18 @@ class SocketServerTest {
   def isSocketConnectionId(connectionId: String, socket: Socket): Boolean =
     connectionId.contains(s":${socket.getLocalPort}-")
 
-  private def verifyAcceptorBlockedPercent(listenerName: String, expectBlocked: Boolean): Unit = {
-    val blockedPercentMetricMBeanName = "kafka.network:type=Acceptor,name=AcceptorBlockedPercent,listener=PLAINTEXT"
-    val blockedPercentMetrics = YammerMetrics.defaultRegistry.allMetrics.asScala
-      .filterKeys(_.getMBeanName == blockedPercentMetricMBeanName).values
-    assertEquals(1, blockedPercentMetrics.size)
-    val blockedPercentMetric = blockedPercentMetrics.head.asInstanceOf[Meter]
-    val blockedPercent = blockedPercentMetric.meanRate
+  private def verifyAcceptorBlockedNanoseconds(listenerName: String, expectBlocked: Boolean): Unit = {
+    val blockedNanosecondsMetricName = "kafka.network.{type=Acceptor}.{name=AcceptorBlockedNanoseconds}.{listener=PLAINTEXT}"
+    val blockedNanosecondsMetrics = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
+      .filterKeys(_ == blockedNanosecondsMetricName).values
+    assertEquals(1, blockedNanosecondsMetrics.size)
+    val blockedNanosecondsMetric = blockedNanosecondsMetrics.head.asInstanceOf[Meter]
+    val blockedNanoseconds = blockedNanosecondsMetric.getMeanRate
     if (expectBlocked) {
-      assertTrue(s"Acceptor blocked percent not recorded: $blockedPercent", blockedPercent > 0.0)
-      assertTrue(s"Unexpected blocked percent in acceptor: $blockedPercent", blockedPercent <= 1.0)
+      assertTrue(s"Acceptor blocked nanoseconds not recorded: $blockedNanoseconds", blockedNanoseconds > 0.0)
+      assertTrue(s"Unexpected blocked nanoseconds in acceptor: $blockedNanoseconds", blockedNanoseconds <= 1.0e9)
     } else {
-      assertEquals(0.0, blockedPercent, 0.001)
+      assertEquals(0.0, blockedNanoseconds, 0.001)
     }
   }
 

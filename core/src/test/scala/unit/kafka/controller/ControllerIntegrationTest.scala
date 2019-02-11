@@ -20,8 +20,8 @@ package kafka.controller
 import java.util.Properties
 import java.util.concurrent.{CountDownLatch, LinkedBlockingQueue}
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.Timer
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Timer
 import kafka.api.LeaderAndIsr
 import kafka.server.{KafkaConfig, KafkaServer}
 import kafka.utils.TestUtils
@@ -277,8 +277,8 @@ class ControllerIntegrationTest extends ZooKeeperTestHarness {
     servers = makeServers(2)
     val controllerId = TestUtils.waitUntilControllerElected(zkClient)
 
-    val metricName = s"kafka.controller:type=ControllerStats,name=${ControllerState.PartitionReassignment.rateAndTimeMetricName.get}"
-    val timerCount = timer(metricName).count
+    val metricName = s"kafka.controller.{type=ControllerStats}.{name=${ControllerState.PartitionReassignment.rateAndTimeMetricName.get}}"
+    val timerCount = timer(metricName).getCount
 
     val otherBrokerId = servers.map(_.config.brokerId).filter(_ != controllerId).head
     val tp = new TopicPartition("t", 0)
@@ -293,7 +293,7 @@ class ControllerIntegrationTest extends ZooKeeperTestHarness {
     TestUtils.waitUntilTrue(() => !zkClient.reassignPartitionsInProgress(),
       "failed to remove reassign partitions path after completion")
 
-    val updatedTimerCount = timer(metricName).count
+    val updatedTimerCount = timer(metricName).getCount
     assertTrue(s"Timer count $updatedTimerCount should be greater than $timerCount", updatedTimerCount > timerCount)
   }
 
@@ -580,12 +580,12 @@ class ControllerIntegrationTest extends ZooKeeperTestHarness {
     otherBroker.shutdown()
     otherBroker.startup()
 
-    assertEquals(0, otherBroker.replicaManager.partitionCount.value())
+    assertEquals(0, otherBroker.replicaManager.partitionCount.getValue())
 
     // Release the latch so that controller can process broker change event
     latch.countDown()
     TestUtils.waitUntilTrue(() => {
-      otherBroker.replicaManager.partitionCount.value() == 1 &&
+      otherBroker.replicaManager.partitionCount.getValue() == 1 &&
       otherBroker.replicaManager.metadataCache.getAllTopics().size == 1 &&
       otherBroker.replicaManager.metadataCache.getAliveBrokers.size == 2
     }, "Broker fail to initialize after restart")
@@ -693,7 +693,7 @@ class ControllerIntegrationTest extends ZooKeeperTestHarness {
   }
 
   private def timer(metricName: String): Timer = {
-    Metrics.defaultRegistry.allMetrics.asScala.filterKeys(_.getMBeanName == metricName).values.headOption
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.filterKeys(_ == metricName).values.headOption
       .getOrElse(fail(s"Unable to find metric $metricName")).asInstanceOf[Timer]
   }
 

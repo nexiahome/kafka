@@ -24,7 +24,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.regex.Pattern
 import java.util.{Collections, Properties}
 
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import kafka.consumer.BaseConsumerRecord
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils._
@@ -78,7 +78,7 @@ object MirrorMaker extends Logging with KafkaMetricsGroup {
   // message was not really acked, but was skipped. This metric records the number of skipped offsets.
   newGauge("MirrorMaker-numDroppedMessages",
     new Gauge[Int] {
-      def value = numDroppedMessages.get()
+      def getValue = numDroppedMessages.get()
     })
 
   def main(args: Array[String]) {
