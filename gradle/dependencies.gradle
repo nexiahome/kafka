@@ -51,7 +51,7 @@ versions += [
   apacheda: "2.0.0.AM2",
   apacheds: "2.0.0.AM25",
   argparse4j: "0.8.1",
-  bcpkix: "1.60",
+  bcpkix: "1.61",
   easymock: "3.6",
   jackson: "2.9.8",
   jetty: "9.4.14.v20181114",
@@ -79,7 +79,7 @@ versions += [
   snappy: "1.1.7.2",
   zkclient: "0.11",
   zookeeper: "3.4.13",
-  jfreechart: "1.0.19",
+  jfreechart: "1.5.0",
   mavenArtifact: "3.6.0"
 ]
 
