@@ -39,7 +39,7 @@ import kafka.utils._
 import kafka.zk.{BrokerInfo, KafkaZkClient}
 import org.apache.kafka.clients.{ApiVersions, ManualMetadataUpdater, NetworkClient, NetworkClientUtils}
 import org.apache.kafka.common.internals.ClusterResourceListeners
-import org.apache.kafka.common.metrics.{JmxReporter, Metrics, _}
+import org.apache.kafka.common.metrics.{Metrics, _}
 import org.apache.kafka.common.network._
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.{ControlledShutdownRequest, ControlledShutdownResponse}
@@ -110,6 +110,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
   private var logContext: LogContext = null
 
   var metrics: Metrics = null
+  var metricsServer: PrometheusMetricsServer = null
 
   val brokerState: BrokerState = new BrokerState
 
@@ -221,9 +222,9 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
 
         /* create and configure metrics */
         val reporters = new util.ArrayList[MetricsReporter]
-        reporters.add(new JmxReporter(jmxPrefix))
         val metricConfig = KafkaServer.metricConfig(config)
         metrics = new Metrics(metricConfig, reporters, time, true)
+        metricsServer = new PrometheusMetricsServer("0.0.0.0", 8080)
 
         /* register broker metrics */
         _brokerTopicStats = new BrokerTopicStats
