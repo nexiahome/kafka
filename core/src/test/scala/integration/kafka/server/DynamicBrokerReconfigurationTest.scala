@@ -535,11 +535,6 @@ class DynamicBrokerReconfigurationTest extends ZooKeeperTestHarness with SaslSet
     val (producerThread, consumerThread) = startProduceConsume(retries = 0, clientId)
     TestUtils.waitUntilTrue(() => consumerThread.received >= 5, "Messages not sent")
 
-    // Verify that JMX reporter is still active (test a metric registered after the dynamic reporter update)
-    val mbeanServer = ManagementFactory.getPlatformMBeanServer
-    val byteRate = mbeanServer.getAttribute(new ObjectName(s"kafka.server:type=Produce,client-id=$clientId"), "byte-rate")
-    assertTrue("JMX attribute not updated", byteRate.asInstanceOf[Double] > 0)
-
     // Property not related to the metrics reporter config should not reconfigure reporter
     newProps.setProperty("some.prop", "some.value")
     reconfigureServers(newProps, perBrokerConfig = false, (TestMetricsReporter.PollingIntervalProp, "100"))
