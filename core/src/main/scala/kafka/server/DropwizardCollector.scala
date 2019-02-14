@@ -28,11 +28,9 @@ import io.prometheus.client.hotspot.DefaultExports
 import kafka.utils._
 
 import scala.collection.JavaConverters._
-import scala.util.matching.Regex
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.lonelyplanet.prometheus.api.MetricsEndpoint
 
@@ -75,10 +73,11 @@ class DropwizardCollector(registry: MetricRegistry)
    */
   private def parseMetricName(dropwizardName: String) = {
     val labelNames = new ArrayList[String]
-    var labelValues = new ArrayList[String]
+    val labelValues = new ArrayList[String]
 
     val matchIter = METRIC_LABEL_RE.findAllIn(dropwizardName)
     while (matchIter.hasNext) {
+      matchIter.next
       labelNames.add(matchIter.group(1))
       labelValues.add(matchIter.group(2))
     }
