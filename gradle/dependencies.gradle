@@ -22,7 +22,7 @@ ext {
   libs = [:]
   
   // Enabled by default when commands like `testAll` are invoked
-  defaultScalaVersions = [ '2.11' ]
+  defaultScalaVersions = [ '2.12' ]
   // Available if -PscalaVersion is used, this is necessary because Scala 2.12 requires Java 8 while Kafka is usually
   // built with Java 7
   availableScalaVersions = [ '2.11', '2.12' ]
@@ -30,7 +30,7 @@ ext {
 
 // Add Scala version
 def defaultScala211Version = '2.11.12'
-def defaultScala212Version = '2.12.4'
+def defaultScala212Version = '2.12.8'
 if (hasProperty('scalaVersion')) {
   if (scalaVersion == '2.11') {
     versions["scala"] = defaultScala211Version
@@ -40,7 +40,7 @@ if (hasProperty('scalaVersion')) {
     versions["scala"] = scalaVersion
   }
 } else {
-  versions["scala"] = defaultScala211Version
+  versions["scala"] = defaultScala212Version
 }
 
 // Add base Scala version
@@ -89,9 +89,9 @@ versions += [
 
 libs += [
   activation: "javax.activation:activation:$versions.activation",
-  akkaActor: "com.typesafe.akka:akka-actor_2.11:$versions.akka",
-  akkaStream: "com.typesafe.akka:akka-stream_2.11:$versions.akka",
-  akkaHttp: "com.typesafe.akka:akka-http_2.11:$versions.akkaHttp",
+  akkaActor: "com.typesafe.akka:akka-actor_$versions.baseScala:$versions.akka",
+  akkaStream: "com.typesafe.akka:akka-stream_$versions.baseScala:$versions.akka",
+  akkaHttp: "com.typesafe.akka:akka-http_$versions.baseScala:$versions.akkaHttp",
   argparse4j: "net.sourceforge.argparse4j:argparse4j:$versions.argparse4j",
   apacheda: "org.apache.directory.api:api-all:$versions.apacheda",
   apachedsCoreApi: "org.apache.directory.server:apacheds-core-api:$versions.apacheds",
@@ -129,7 +129,7 @@ libs += [
   powermockEasymock: "org.powermock:powermock-api-easymock:$versions.powermock",
   prometheus: "io.prometheus:simpleclient:$versions.prometheus",
   prometheusHotspot: "io.prometheus:simpleclient_hotspot:$versions.prometheus",
-  prometheusAkkaHttp: "com.lonelyplanet:prometheus-akka-http_2.11:$versions.prometheusAkkaHttp",
+  prometheusAkkaHttp: "com.lonelyplanet:prometheus-akka-http_$versions.baseScala:$versions.prometheusAkkaHttp",
   reflections: "org.reflections:reflections:$versions.reflections",
   rocksDBJni: "org.rocksdb:rocksdbjni:$versions.rocksDB",
   scalaLibrary: "org.scala-lang:scala-library:$versions.scala",
