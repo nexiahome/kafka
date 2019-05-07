@@ -38,6 +38,16 @@ allprojects {
 
   repositories {
     mavenCentral()
+    maven { url "https://dl.bintray.com/lonelyplanet/maven" }
+    maven {
+      url "https://artifactory.nexiabuild.com/artifactory/libs-release"
+      // to develop locally, copy these values from your ~/.m2/settings.xml
+      // DO NOT commit them! We do not want to commit secrets to github.
+      credentials {
+        username "__FIXUSER__"
+        password "__FIXPW__"
+      }
+    }
   }
   
   apply plugin: 'idea'
