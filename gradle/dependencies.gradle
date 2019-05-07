@@ -20,7 +20,7 @@
 ext {
   versions = [:]
   libs = [:]
-  
+
   // Enabled by default when commands like `testAll` are invoked
   defaultScalaVersions = [ '2.12' ]
   // Available if -PscalaVersion is used, this is necessary because Scala 2.12 requires Java 8 while Kafka is usually
@@ -76,7 +76,7 @@ versions += [
   prometheus: "0.6.0",
   prometheusAkkaHttp: "0.4.0",
   reflections: "0.9.11",
-  rocksDB: "5.17.2",
+  rocksDB: "5.18.32nexia",
   scalatest: "3.0.5",
   scoverage: "1.3.1",
   slf4j: "1.7.25",
@@ -131,7 +131,7 @@ libs += [
   prometheusHotspot: "io.prometheus:simpleclient_hotspot:$versions.prometheus",
   prometheusAkkaHttp: "com.lonelyplanet:prometheus-akka-http_$versions.baseScala:$versions.prometheusAkkaHttp",
   reflections: "org.reflections:reflections:$versions.reflections",
-  rocksDBJni: "org.rocksdb:rocksdbjni:$versions.rocksDB",
+  rocksDBJni: "org.rocksdb:rocksdbjni:$versions.rocksDB:linux64",
   scalaLibrary: "org.scala-lang:scala-library:$versions.scala",
   scalaLogging: "com.typesafe.scala-logging:scala-logging_$versions.baseScala:$versions.scalaLogging",
   scalaReflect: "org.scala-lang:scala-reflect:$versions.scala",
