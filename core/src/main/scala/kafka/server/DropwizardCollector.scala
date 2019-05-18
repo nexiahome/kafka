@@ -108,9 +108,9 @@ class DropwizardCollector(registry: MetricRegistry)
             name,
             Collector.Type.COUNTER,
             getHelpMessage(dropwizardName, meter),
-            Arrays.asList(
+            new ArrayList[Collector.MetricFamilySamples.Sample](Arrays.asList(
                 new Collector.MetricFamilySamples.Sample(
-                    name, labelNames, labelValues, meter.getCount))))
+                    name, labelNames, labelValues, meter.getCount)))))
   }
 
   /**
@@ -124,12 +124,12 @@ class DropwizardCollector(registry: MetricRegistry)
             name,
             Collector.Type.GAUGE,
             getHelpMessage(dropwizardName, counter),
-            Arrays.asList(
+            new ArrayList[Collector.MetricFamilySamples.Sample](Arrays.asList(
                 new Collector.MetricFamilySamples.Sample(
                     name,
                     labelNames,
                     labelValues,
-                    counter.getCount.toDouble))))
+                    counter.getCount.toDouble)))))
   }
 
   /** Export gauge as a prometheus gauge. */
@@ -160,9 +160,9 @@ class DropwizardCollector(registry: MetricRegistry)
               name,
               Collector.Type.GAUGE,
               getHelpMessage(dropwizardName, gauge),
-              Arrays.asList(
+              new ArrayList[Collector.MetricFamilySamples.Sample](Arrays.asList(
                   new Collector.MetricFamilySamples.Sample(
-                      name, labelNames, labelValues, x))))
+                      name, labelNames, labelValues, x)))))
       case _ => Arrays.asList()
     }
   }
@@ -217,7 +217,7 @@ class DropwizardCollector(registry: MetricRegistry)
       new Collector.MetricFamilySamples.Sample(name + "_count", labelNames, labelValues, count)
     )
 
-    val samples: List[Collector.MetricFamilySamples.Sample] = sampleList.asJava
+    val samples: List[Collector.MetricFamilySamples.Sample] = new ArrayList[Collector.MetricFamilySamples.Sample](sampleList.asJava)
     Arrays.asList(new Collector.MetricFamilySamples(name, Collector.Type.SUMMARY, helpMessage, samples))
   }
 
