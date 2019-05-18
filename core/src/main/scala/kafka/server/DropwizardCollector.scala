@@ -18,7 +18,7 @@
 package kafka.server
 
 import java.util.concurrent.TimeUnit
-import java.util.{ArrayList, Arrays, List}
+import java.util.{ArrayList, Arrays, HashMap, List}
 
 import com.codahale.metrics._
 import io.prometheus.client.Collector
@@ -78,7 +78,8 @@ class DropwizardCollector(registry: MetricRegistry)
     val matchIter = METRIC_LABEL_RE.findAllIn(dropwizardName)
     while (matchIter.hasNext) {
       matchIter.next
-      labelNames.add(matchIter.group(1))
+      val noMetaLabelName = METRIC_NAME_RE.replaceAllIn(matchIter.group(1), "_")
+      labelNames.add(noMetaLabelName)
       labelValues.add(matchIter.group(2))
     }
 
@@ -242,23 +243,55 @@ class DropwizardCollector(registry: MetricRegistry)
 
   override def collect(): List[Collector.MetricFamilySamples] = {
     val mfSamples = new ArrayList[Collector.MetricFamilySamples]
+    val mfHash = new HashMap[String, Collector.MetricFamilySamples]
 
     registry.getMeters.entrySet.asScala.foreach { entry =>
-      mfSamples.addAll(fromMeter(entry.getKey, entry.getValue))
+      fromMeter(entry.getKey, entry.getValue).asScala.foreach { mfs =>
+        if (mfHash.containsKey(mfs.name)) {
+          mfHash.get(mfs.name).samples.addAll(mfs.samples)
+        } else {
+          mfHash.put(mfs.name, mfs)
+        }
+      }
     }
     registry.getCounters.entrySet.asScala.foreach { entry =>
-      mfSamples.addAll(fromCounter(entry.getKey, entry.getValue))
+      fromCounter(entry.getKey, entry.getValue).asScala.foreach { mfs =>
+        if (mfHash.containsKey(mfs.name)) {
+          mfHash.get(mfs.name).samples.addAll(mfs.samples)
+        } else {
+          mfHash.put(mfs.name, mfs)
+        }
+      }
     }
     registry.getGauges.entrySet.asScala.foreach { entry =>
-      mfSamples.addAll(fromGauge(entry.getKey, entry.getValue.asInstanceOf[Gauge[_]]))
+      fromGauge(entry.getKey, entry.getValue.asInstanceOf[Gauge[_]]).asScala.foreach { mfs =>
+        if (mfHash.containsKey(mfs.name)) {
+          mfHash.get(mfs.name).samples.addAll(mfs.samples)
+        } else {
+          mfHash.put(mfs.name, mfs)
+        }
+      }
     }
     registry.getHistograms.entrySet.asScala.foreach { entry =>
-      mfSamples.addAll(fromHistogram(entry.getKey, entry.getValue))
+      fromHistogram(entry.getKey, entry.getValue).asScala.foreach { mfs =>
+        if (mfHash.containsKey(mfs.name)) {
+          mfHash.get(mfs.name).samples.addAll(mfs.samples)
+        } else {
+          mfHash.put(mfs.name, mfs)
+        }
+      }
     }
     registry.getTimers.entrySet.asScala.foreach { entry =>
-      mfSamples.addAll(fromTimer(entry.getKey, entry.getValue))
+      fromTimer(entry.getKey, entry.getValue).asScala.foreach { mfs =>
+        if (mfHash.containsKey(mfs.name)) {
+          mfHash.get(mfs.name).samples.addAll(mfs.samples)
+        } else {
+          mfHash.put(mfs.name, mfs)
+        }
+      }
     }
 
+    mfSamples.addAll(mfHash.values())
     mfSamples
   }
 
