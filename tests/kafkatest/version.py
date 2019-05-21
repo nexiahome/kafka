@@ -60,7 +60,7 @@ def get_version(node=None):
         return DEV_BRANCH
 
 DEV_BRANCH = KafkaVersion("dev")
-DEV_VERSION = KafkaVersion("1.1.1-nexia5")
+DEV_VERSION = KafkaVersion("1.1.1-nexia6")
 
 # 0.8.2.X versions
 V_0_8_2_1 = KafkaVersion("0.8.2.1")
