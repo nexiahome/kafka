@@ -26,7 +26,7 @@
     <parent>
         <groupId>org.apache.kafka</groupId>
         <artifactId>streams-quickstart</artifactId>
-        <version>1.1.1-nexia7</version>
+        <version>1.1.1-nexia8</version>
         <relativePath>..</relativePath>
     </parent>
 
