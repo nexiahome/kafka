@@ -424,24 +424,25 @@ public class MockProcessorContext implements ProcessorContext, RecordCollector.S
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key, final V value) {
-        forward(key, value, To.all());
+    public <K, V> Long forward(final K key, final V value) {
+        return forward(key, value, To.all());
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key, final V value, final To to) {
+    public <K, V> Long forward(final K key, final V value, final To to) {
         capturedForwards.add(
             new CapturedForward(
                 to.timestamp == -1 ? to.withTimestamp(timestamp == null ? -1 : timestamp) : to,
                 new KeyValue(key, value)
             )
         );
+        return offset();
     }
 
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final int childIndex) {
+    public <K, V> Long forward(final K key, final V value, final int childIndex) {
         throw new UnsupportedOperationException(
             "Forwarding to a child by index is deprecated. " +
                 "Please transition processors to forward using a 'To' object instead."
@@ -450,7 +451,7 @@ public class MockProcessorContext implements ProcessorContext, RecordCollector.S
 
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final String childName) {
+    public <K, V> Long forward(final K key, final V value, final String childName) {
         throw new UnsupportedOperationException(
             "Forwarding to a child by name is deprecated. " +
                 "Please transition processors to forward using 'To.child(childName)' instead."

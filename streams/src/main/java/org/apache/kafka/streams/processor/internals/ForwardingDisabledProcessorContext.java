@@ -101,24 +101,24 @@ public final class ForwardingDisabledProcessorContext implements ProcessorContex
     }
 
     @Override
-    public <K, V> void forward(final K key, final V value) {
+    public <K, V> Long forward(final K key, final V value) {
         throw new StreamsException("ProcessorContext#forward() not supported.");
     }
 
     @Override
-    public <K, V> void forward(final K key, final V value, final To to) {
-        throw new StreamsException("ProcessorContext#forward() not supported.");
-    }
-
-    @Override
-    @Deprecated
-    public <K, V> void forward(final K key, final V value, final int childIndex) {
+    public <K, V> Long forward(final K key, final V value, final To to) {
         throw new StreamsException("ProcessorContext#forward() not supported.");
     }
 
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final String childName) {
+    public <K, V> Long forward(final K key, final V value, final int childIndex) {
+        throw new StreamsException("ProcessorContext#forward() not supported.");
+    }
+
+    @Override
+    @Deprecated
+    public <K, V> Long forward(final K key, final V value, final String childName) {
         throw new StreamsException("ProcessorContext#forward() not supported.");
     }
 

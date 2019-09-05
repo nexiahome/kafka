@@ -37,7 +37,7 @@ public interface Processor<K, V> {
      * The provided {@link ProcessorContext context} can be used to access topology and record meta data, to
      * {@link ProcessorContext#schedule(Duration, PunctuationType, Punctuator) schedule} a method to be
      * {@link Punctuator#punctuate(long) called periodically} and to access attached {@link StateStore}s.
-     * 
+     *
      * @param context the context; may not be null
      */
     void init(ProcessorContext context);
@@ -49,6 +49,29 @@ public interface Processor<K, V> {
      * @param value the value for the record
      */
     void process(K key, V value);
+
+    /**
+     * Asynchronously process the record with the given key and value.
+     * By default, calls the synchronous {@link #process()} method and
+     * returns the offset of the record that was just processed.
+     *
+     * For now, only works if this is defined on the root node of the
+     * topology, as a Topology is inherenly defined in terms of a
+     * synchronous processing operation. Hopefully in the future we
+     * can maybe tag a Processor as asynchronous, and execute it
+     * within a worker pool of some kind. Right now, that is the
+     * application's responsibility.
+     *
+     * @param key the key for the record
+     * @param value the value for the record
+     * @param offset the offset for the record
+     *
+     * @return the offset of the most recent consecutively-processed message for this record's TopicPartition
+     */
+    default Long maybeProcessAsync(K key, V value, Long offset) {
+        process(key, value);
+        return offset;
+    }
 
     /**
      * Close this processor and clean up any resources. Be aware that {@code #close()} is called after an internal cleanup.

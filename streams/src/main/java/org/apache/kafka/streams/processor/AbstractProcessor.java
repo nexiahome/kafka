@@ -54,4 +54,9 @@ public abstract class AbstractProcessor<K, V> implements Processor<K, V> {
     protected final ProcessorContext context() {
         return context;
     }
+
+    /**
+     * Default implementation of maybeProcessAsync() calls the default process() method, and returns
+     * the offset of the current
+     */
 }

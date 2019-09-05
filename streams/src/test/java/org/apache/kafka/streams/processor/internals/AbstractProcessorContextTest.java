@@ -218,18 +218,26 @@ public class AbstractProcessorContextTest {
         }
 
         @Override
-        public <K, V> void forward(final K key, final V value) {}
+        public <K, V> Long forward(final K key, final V value) {
+            return offset();
+        }
 
         @Override
-        public <K, V> void forward(final K key, final V value, final To to) {}
+        public <K, V> Long forward(final K key, final V value, final To to) {
+            return offset();
+        }
 
         @Override
         @Deprecated
-        public <K, V> void forward(final K key, final V value, final int childIndex) {}
+        public <K, V> Long forward(final K key, final V value, final int childIndex) {
+            return offset();
+        }
 
         @Override
         @Deprecated
-        public <K, V> void forward(final K key, final V value, final String childName) {}
+        public <K, V> Long forward(final K key, final V value, final String childName) {
+            return offset();
+        }
 
         @Override
         public void commit() {}

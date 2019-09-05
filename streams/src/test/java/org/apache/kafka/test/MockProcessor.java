@@ -48,6 +48,8 @@ public class MockProcessor<K, V> extends AbstractProcessor<K, V> {
     private final long scheduleInterval;
 
     private boolean commitRequested = false;
+    private boolean overrideAsyncReturn = false;
+    private Long overrideAsyncReturnValue;
 
     public MockProcessor(final PunctuationType punctuationType,
                          final long scheduleInterval) {
@@ -99,6 +101,12 @@ public class MockProcessor<K, V> extends AbstractProcessor<K, V> {
             context().commit();
             commitRequested = false;
         }
+    }
+
+    @Override
+    public Long maybeProcessAsync(K key, V value, Long offset) {
+        process(key, value);
+        return overrideAsyncReturn ? overrideAsyncReturnValue : offset;
     }
 
     public void checkAndClearProcessResult(final String... expected) {

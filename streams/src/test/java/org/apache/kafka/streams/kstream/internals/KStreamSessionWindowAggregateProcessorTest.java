@@ -102,9 +102,11 @@ public class KStreamSessionWindowAggregateProcessorTest {
             new ThreadCache(new LogContext("testCache "), 100000, metrics)
         ) {
             @Override
-            public <K, V> void forward(final K key, final V value, final To to) {
+            public <K, V> Long forward(final K key, final V value, final To to) {
                 toInternal.update(to);
                 results.add(new KeyValueTimestamp<>(key, value, toInternal.timestamp()));
+
+                return offset();
             }
         };
 

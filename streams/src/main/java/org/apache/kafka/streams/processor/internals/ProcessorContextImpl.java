@@ -128,18 +128,18 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key,
+    public <K, V> Long forward(final K key,
                                final V value) {
-        forward(key, value, SEND_TO_ALL);
+        return forward(key, value, SEND_TO_ALL);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> void forward(final K key,
+    public <K, V> Long forward(final K key,
                                final V value,
                                final int childIndex) {
-        forward(
+        return forward(
             key,
             value,
             To.child(((List<ProcessorNode>) currentNode().children()).get(childIndex).name()));
@@ -148,19 +148,20 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> void forward(final K key,
+    public <K, V> Long forward(final K key,
                                final V value,
                                final String childName) {
-        forward(key, value, To.child(childName));
+        return forward(key, value, To.child(childName));
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key,
+    public <K, V> Long forward(final K key,
                                final V value,
                                final To to) {
         final ProcessorNode previousNode = currentNode();
         final ProcessorRecordContext previousContext = recordContext;
+        Long lastProcessedOffset = recordContext.offset();
 
         try {
             toInternal.update(to);
@@ -177,7 +178,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
             if (sendTo == null) {
                 final List<ProcessorNode<K, V>> children = (List<ProcessorNode<K, V>>) currentNode().children();
                 for (final ProcessorNode child : children) {
-                    forward(child, key, value);
+                    lastProcessedOffset = forward(child, key, value);
                 }
             } else {
                 final ProcessorNode child = currentNode().getChild(sendTo);
@@ -185,20 +186,21 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
                     throw new StreamsException("Unknown downstream node: " + sendTo
                         + " either does not exist or is not connected to this processor.");
                 }
-                forward(child, key, value);
+                lastProcessedOffset = forward(child, key, value);
             }
         } finally {
             recordContext = previousContext;
             setCurrentNode(previousNode);
         }
+        return lastProcessedOffset;
     }
 
     @SuppressWarnings("unchecked")
-    private <K, V> void forward(final ProcessorNode child,
+    private <K, V> Long forward(final ProcessorNode child,
                                 final K key,
                                 final V value) {
         setCurrentNode(child);
-        child.process(key, value);
+        return child.maybeProcessAsync(key, value, recordContext.offset());
     }
 
     @Override

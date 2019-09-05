@@ -33,6 +33,10 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
     public boolean closed;
     public boolean initialized;
 
+    public boolean overrideAsyncReturn = false;
+    public Long overrideAsyncReturnValue;
+
+
     public MockProcessorNode(final long scheduleInterval) {
         this(scheduleInterval, PunctuationType.STREAM_TIME);
     }
@@ -61,6 +65,18 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
     public void process(final K key, final V value) {
         processor().process(key, value);
     }
+
+    @Override
+    public Long maybeProcessAsync(K key, V value, Long offset) {
+        Long processedOffset = processor().maybeProcessAsync(key, value, offset);
+        if (overrideAsyncReturn) {
+            processedOffset = overrideAsyncReturnValue;
+        }
+
+        return processedOffset;
+    }
+
+
 
     @Override
     public void close() {

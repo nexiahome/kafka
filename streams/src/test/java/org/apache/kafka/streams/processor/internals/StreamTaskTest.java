@@ -390,6 +390,41 @@ public class StreamTaskTest {
         assertEquals(3, source2.numReceived);
     }
 
+    @Test
+    public void testAsyncProcessorDoesNotSetCommitNeeded() {
+        task = createStatelessTask(createConfig(false));
+        processorStreamTime.overrideAsyncReturn = true;
+        processorStreamTime.overrideAsyncReturnValue = 1L;
+
+        processorSystemTime.overrideAsyncReturn = true;
+        processorSystemTime.overrideAsyncReturnValue = 1L;
+
+        task.addRecords(partition1, asList(
+            getConsumerRecord(partition1, 10)
+        ));
+
+        task.addRecords(partition2, asList(
+            getConsumerRecord(partition2, 25)
+        ));
+
+        // first time through, the maybeProcessAsync will return a
+        // value that should trigger the task to need a commit
+        assertTrue(task.process());
+        assertTrue(task.commitNeeded());
+
+        task.commit();
+        assertFalse(task.commitNeeded());
+
+        // After this, we can process all we want, but the ProcessorNode
+        // will return the same offset, so we don't need to commit again
+        // until it changes.
+        assertTrue(task.process());
+        System.out.println("is commit needed?" + task.commitNeeded());
+        assertFalse(task.commitNeeded());
+
+        processorStreamTime.overrideAsyncReturn = false;
+        processorSystemTime.overrideAsyncReturn = false;
+    }
 
     @Test
     public void testMetrics() {

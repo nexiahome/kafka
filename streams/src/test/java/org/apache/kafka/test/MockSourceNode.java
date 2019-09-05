@@ -35,6 +35,7 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     public final ArrayList<V> values = new ArrayList<>();
     public boolean initialized;
     public boolean closed;
+    public boolean processedSynchronously = true;
 
     public MockSourceNode(final String[] topics, final Deserializer<K> keyDeserializer, final Deserializer<V> valDeserializer) {
         super(NAME + INDEX.getAndIncrement(), Arrays.asList(topics), keyDeserializer, valDeserializer);
@@ -45,6 +46,13 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
         this.numReceived++;
         this.keys.add(key);
         this.values.add(value);
+    }
+
+    @Override
+    public Long maybeProcessAsync(final K key, final V value, final Long offset) {
+        process(key, value);
+        this.processedSynchronously = false;
+        return offset;
     }
 
     @Override

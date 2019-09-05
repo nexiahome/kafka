@@ -112,10 +112,24 @@ public class ProcessorNode<K, V> {
     }
 
 
+    /**
+     * Synchronous version
+     */
     public void process(final K key, final V value) {
         final long startNs = time.nanoseconds();
         processor.process(key, value);
         nodeMetrics.nodeProcessTimeSensor.record(time.nanoseconds() - startNs);
+    }
+
+    /**
+     * possibly asynchronous version
+     */
+    public Long maybeProcessAsync(final K key, final V value, final Long offset) {
+        final long startNs = time.nanoseconds();
+        final Long processedOffset = processor.maybeProcessAsync(key, value, offset);
+        nodeMetrics.nodeProcessTimeSensor.record(time.nanoseconds() - startNs);
+
+        return processedOffset;
     }
 
     public void punctuate(final long timestamp, final Punctuator punctuator) {

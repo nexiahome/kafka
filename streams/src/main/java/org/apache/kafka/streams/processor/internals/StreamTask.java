@@ -363,13 +363,15 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
             log.trace("Start processing one record [{}]", record);
 
             updateProcessorContext(record, currNode);
-            currNode.process(record.key(), record.value());
+            final Long committedOffset = currNode.maybeProcessAsync(record.key(), record.value(), record.offset());
 
             log.trace("Completed processing one record [{}]", record);
 
             // update the consumed offset map after processing is done
-            consumedOffsets.put(partition, record.offset());
-            commitNeeded = true;
+            if (consumedOffsets.containsKey(partition) && !consumedOffsets.get(partition).equals(committedOffset)) {
+                consumedOffsets.put(partition, committedOffset);
+                commitNeeded = true;
+            }
 
             // after processing this record, if its partition queue's buffered size has been
             // decreased to the threshold, we can then resume the consumption on this partition
