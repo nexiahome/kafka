@@ -36,6 +36,8 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     public boolean initialized;
     public boolean closed;
     public boolean processedSynchronously = true;
+    public boolean overrideProcessAsync = false;
+    public long overrideAsyncOffset = -1;
 
     public MockSourceNode(final String[] topics, final Deserializer<K> keyDeserializer, final Deserializer<V> valDeserializer) {
         super(NAME + INDEX.getAndIncrement(), Arrays.asList(topics), keyDeserializer, valDeserializer);
@@ -49,10 +51,10 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     }
 
     @Override
-    public Long maybeProcessAsync(final K key, final V value, final Long offset) {
+    public long maybeProcessAsync(final K key, final V value, final Long offset) {
         process(key, value);
         this.processedSynchronously = false;
-        return offset;
+        return overrideProcessAsync ? overrideAsyncOffset : offset;
     }
 
     @Override
@@ -65,5 +67,14 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     public void close() {
         super.close();
         this.closed = true;
+    }
+
+    public void overrideAsyncAndReturnOffset(long offset) {
+        overrideProcessAsync = true;
+        overrideAsyncOffset = offset;
+    }
+
+    public void resetAsyncOverride() {
+        overrideProcessAsync = false;
     }
 }

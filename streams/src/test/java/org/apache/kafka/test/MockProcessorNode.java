@@ -67,7 +67,7 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
     }
 
     @Override
-    public Long maybeProcessAsync(K key, V value, Long offset) {
+    public long maybeProcessAsync(K key, V value, Long offset) {
         Long processedOffset = processor().maybeProcessAsync(key, value, offset);
         if (overrideAsyncReturn) {
             processedOffset = overrideAsyncReturnValue;
@@ -76,11 +76,18 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
         return processedOffset;
     }
 
-
-
     @Override
     public void close() {
         super.close();
         this.closed = true;
+    }
+
+    public void overrideAsyncAndReturnOffset(long offset) {
+        overrideAsyncReturn = true;
+        overrideAsyncReturnValue = offset;
+    }
+
+    public void resetAsyncOverride() {
+        overrideAsyncReturn = false;
     }
 }

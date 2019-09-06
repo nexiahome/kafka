@@ -368,7 +368,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
             log.trace("Completed processing one record [{}]", record);
 
             // update the consumed offset map after processing is done
-            if (consumedOffsets.containsKey(partition) && !consumedOffsets.get(partition).equals(committedOffset)) {
+            if (!(consumedOffsets.containsKey(partition) && consumedOffsets.get(partition).equals(committedOffset))) {
                 consumedOffsets.put(partition, committedOffset);
                 commitNeeded = true;
             }

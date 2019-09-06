@@ -391,39 +391,37 @@ public class StreamTaskTest {
     }
 
     @Test
-    public void testAsyncProcessorDoesNotSetCommitNeeded() {
+    public void shouldNotSetCommitNeededWhenProcessingAsync() {
         task = createStatelessTask(createConfig(false));
-        processorStreamTime.overrideAsyncReturn = true;
-        processorStreamTime.overrideAsyncReturnValue = 1L;
+        task.initializeTopology();
 
-        processorSystemTime.overrideAsyncReturn = true;
-        processorSystemTime.overrideAsyncReturnValue = 1L;
 
         task.addRecords(partition1, asList(
-            getConsumerRecord(partition1, 10)
+            getConsumerRecord(partition1, 10),
+            getConsumerRecord(partition1, 20)
         ));
 
-        task.addRecords(partition2, asList(
-            getConsumerRecord(partition2, 25)
-        ));
+        try {
+            // force the node to always return the same offset
+            // so that it won't try to commit the second time.
+            source1.overrideAsyncAndReturnOffset(1);
 
-        // first time through, the maybeProcessAsync will return a
-        // value that should trigger the task to need a commit
-        assertTrue(task.process());
-        assertTrue(task.commitNeeded());
+            // first time through, the maybeProcessAsync will return a
+            // value that should trigger the task to need a commit
+            assertTrue(task.process());
+            assertTrue(task.commitNeeded());
 
-        task.commit();
-        assertFalse(task.commitNeeded());
+            task.commit();
+            assertFalse(task.commitNeeded());
 
-        // After this, we can process all we want, but the ProcessorNode
-        // will return the same offset, so we don't need to commit again
-        // until it changes.
-        assertTrue(task.process());
-        System.out.println("is commit needed?" + task.commitNeeded());
-        assertFalse(task.commitNeeded());
-
-        processorStreamTime.overrideAsyncReturn = false;
-        processorSystemTime.overrideAsyncReturn = false;
+            // After this, we can process all we want, but the ProcessorNode
+            // will return the same offset, so we don't need to commit again
+            // until it changes.
+            assertTrue(task.process());
+            assertFalse(task.commitNeeded());
+        } finally {
+            source1.resetAsyncOverride();
+        }
     }
 
     @Test

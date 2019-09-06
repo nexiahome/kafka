@@ -276,6 +276,6 @@ public abstract class AbstractTask implements Task {
     }
 
     public Collection<TopicPartition> changelogPartitions() {
-        return statqeMgr.changelogPartitions();
+        return stateMgr.changelogPartitions();
     }
 }
