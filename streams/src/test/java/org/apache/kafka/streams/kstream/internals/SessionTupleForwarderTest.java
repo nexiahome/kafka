@@ -61,15 +61,17 @@ public class SessionTupleForwarderTest {
 
         expect(store.setFlushListener(null, sendOldValued)).andReturn(false);
         if (sendOldValued) {
-            context.forward(
+            expect(context.forward(
                 new Windowed<>("key", new SessionWindow(21L, 42L)),
                 new Change<>("value", "oldValue"),
-                To.all().withTimestamp(42L));
+                To.all().withTimestamp(42L)))
+                .andReturn(10L);
         } else {
-            context.forward(
+            expect(context.forward(
                 new Windowed<>("key", new SessionWindow(21L, 42L)),
                 new Change<>("value", null),
-                To.all().withTimestamp(42L));
+                To.all().withTimestamp(42L)))
+                .andReturn(10L);
         }
         expectLastCall();
         replay(store, context);

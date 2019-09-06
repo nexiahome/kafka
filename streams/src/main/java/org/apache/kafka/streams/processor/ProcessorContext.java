@@ -173,7 +173,7 @@ public interface ProcessorContext {
      * @param key key
      * @param value value
      */
-    <K, V> Long forward(final K key, final V value);
+    <K, V> long forward(final K key, final V value);
 
     /**
      * Forwards a key/value pair to the specified downstream processors.
@@ -183,7 +183,7 @@ public interface ProcessorContext {
      * @param value value
      * @param to the options to use when forwarding
      */
-    <K, V> Long forward(final K key, final V value, final To to);
+    <K, V> long forward(final K key, final V value, final To to);
 
     /**
      * Forwards a key/value pair to one of the downstream processors designated by childIndex
@@ -194,7 +194,7 @@ public interface ProcessorContext {
      */
     // TODO when we remove this method, we can also remove `ProcessorNode#children`
     @Deprecated
-    <K, V> Long forward(final K key, final V value, final int childIndex);
+    <K, V> long forward(final K key, final V value, final int childIndex);
 
     /**
      * Forwards a key/value pair to one of the downstream processors designated by the downstream processor name
@@ -204,7 +204,7 @@ public interface ProcessorContext {
      * @deprecated please use {@link #forward(Object, Object, To)} instead
      */
     @Deprecated
-    <K, V> Long forward(final K key, final V value, final String childName);
+    <K, V> long forward(final K key, final V value, final String childName);
 
     /**
      * Requests a commit

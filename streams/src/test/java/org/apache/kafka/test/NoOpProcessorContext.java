@@ -70,26 +70,26 @@ public class NoOpProcessorContext extends AbstractProcessorContext {
     }
 
     @Override
-    public <K, V> Long forward(final K key, final V value) {
+    public <K, V> long forward(final K key, final V value) {
         forwardedValues.put(key, value);
         return recordContext().offset();
     }
 
     @Override
-    public <K, V> Long forward(final K key, final V value, final To to) {
+    public <K, V> long forward(final K key, final V value, final To to) {
         forwardedValues.put(key, value);
         return recordContext().offset();
     }
 
     @Override
     @Deprecated
-    public <K, V> Long forward(final K key, final V value, final int childIndex) {
+    public <K, V> long forward(final K key, final V value, final int childIndex) {
         return forward(key, value);
     }
 
     @Override
     @Deprecated
-    public <K, V> Long forward(final K key, final V value, final String childName) {
+    public <K, V> long forward(final K key, final V value, final String childName) {
         return forward(key, value);
     }
 

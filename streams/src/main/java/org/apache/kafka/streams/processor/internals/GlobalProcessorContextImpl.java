@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.streams.processor.internals;
 
+import static org.apache.kafka.common.utils.Utils.min;
+
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
@@ -71,13 +73,13 @@ public class GlobalProcessorContextImpl extends AbstractProcessorContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> Long forward(final K key, final V value) {
+    public <K, V> long forward(final K key, final V value) {
         final ProcessorNode previousNode = currentNode();
         Long lastProcessedOffset = recordContext().offset();
         try {
             for (final ProcessorNode child : (List<ProcessorNode<K, V>>) currentNode().children()) {
                 setCurrentNode(child);
-                lastProcessedOffset = child.maybeProcessAsync(key, value, recordContext.offset());
+                lastProcessedOffset = min(child.maybeProcessAsync(key, value, offset()), lastProcessedOffset);
             }
         } finally {
             setCurrentNode(previousNode);
@@ -89,7 +91,7 @@ public class GlobalProcessorContextImpl extends AbstractProcessorContext {
      * No-op. This should only be called on GlobalStateStore#flush and there should be no child nodes
      */
     @Override
-    public <K, V> Long forward(final K key, final V value, final To to) {
+    public <K, V> long forward(final K key, final V value, final To to) {
         if (!currentNode().children().isEmpty()) {
             throw new IllegalStateException("This method should only be called on 'GlobalStateStore.flush' that should not have any children.");
         }
@@ -101,7 +103,7 @@ public class GlobalProcessorContextImpl extends AbstractProcessorContext {
      */
     @Override
     @Deprecated
-    public <K, V> Long forward(final K key, final V value, final int childIndex) {
+    public <K, V> long forward(final K key, final V value, final int childIndex) {
         throw new UnsupportedOperationException("this should not happen: forward() not supported in global processor context.");
     }
 
@@ -110,7 +112,7 @@ public class GlobalProcessorContextImpl extends AbstractProcessorContext {
      */
     @Override
     @Deprecated
-    public <K, V> Long forward(final K key, final V value, final String childName) {
+    public <K, V> long forward(final K key, final V value, final String childName) {
         throw new UnsupportedOperationException("this should not happen: forward() not supported in global processor context.");
     }
 

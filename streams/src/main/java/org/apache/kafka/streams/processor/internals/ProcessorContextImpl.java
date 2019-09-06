@@ -43,6 +43,7 @@ import org.apache.kafka.streams.state.internals.WrappedStateStore;
 import java.time.Duration;
 import java.util.List;
 
+import static org.apache.kafka.common.utils.Utils.min;
 import static org.apache.kafka.streams.internals.ApiUtils.prepareMillisCheckFailMsgPrefix;
 
 public class ProcessorContextImpl extends AbstractProcessorContext implements RecordCollector.Supplier {
@@ -128,7 +129,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> Long forward(final K key,
+    public <K, V> long forward(final K key,
                                final V value) {
         return forward(key, value, SEND_TO_ALL);
     }
@@ -136,7 +137,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> Long forward(final K key,
+    public <K, V> long forward(final K key,
                                final V value,
                                final int childIndex) {
         return forward(
@@ -148,7 +149,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> Long forward(final K key,
+    public <K, V> long forward(final K key,
                                final V value,
                                final String childName) {
         return forward(key, value, To.child(childName));
@@ -156,12 +157,12 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> Long forward(final K key,
+    public <K, V> long forward(final K key,
                                final V value,
                                final To to) {
         final ProcessorNode previousNode = currentNode();
         final ProcessorRecordContext previousContext = recordContext;
-        Long lastProcessedOffset = recordContext.offset();
+        long lastProcessedOffset = recordContext.offset();
 
         try {
             toInternal.update(to);
@@ -178,7 +179,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
             if (sendTo == null) {
                 final List<ProcessorNode<K, V>> children = (List<ProcessorNode<K, V>>) currentNode().children();
                 for (final ProcessorNode child : children) {
-                    lastProcessedOffset = forward(child, key, value);
+                    lastProcessedOffset = min(forward(child, key, value), lastProcessedOffset);
                 }
             } else {
                 final ProcessorNode child = currentNode().getChild(sendTo);
@@ -200,7 +201,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
                                 final K key,
                                 final V value) {
         setCurrentNode(child);
-        return child.maybeProcessAsync(key, value, recordContext.offset());
+        return child.maybeProcessAsync(key, value, offset());
     }
 
     @Override

@@ -51,7 +51,7 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     }
 
     @Override
-    public long maybeProcessAsync(final K key, final V value, final Long offset) {
+    public long maybeProcessAsync(final K key, final V value, final long offset) {
         process(key, value);
         this.processedSynchronously = false;
         return overrideProcessAsync ? overrideAsyncOffset : offset;

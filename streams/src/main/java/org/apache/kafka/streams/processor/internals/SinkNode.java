@@ -102,6 +102,12 @@ public class SinkNode<K, V> extends ProcessorNode<K, V> {
         }
     }
 
+    @Override
+    public long maybeProcessAsync(final K key, final V value, final long offset) {
+        process(key, value);
+        return offset;
+    }
+
     /**
      * @return a string representation of this node, useful for debugging.
      */

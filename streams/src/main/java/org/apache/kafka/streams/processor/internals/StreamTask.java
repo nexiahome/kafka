@@ -363,7 +363,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
             log.trace("Start processing one record [{}]", record);
 
             updateProcessorContext(record, currNode);
-            final Long committedOffset = currNode.maybeProcessAsync(record.key(), record.value(), record.offset());
+            final long committedOffset = currNode.maybeProcessAsync(record.key(), record.value(), record.offset());
 
             log.trace("Completed processing one record [{}]", record);
 

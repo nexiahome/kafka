@@ -125,9 +125,9 @@ public class ProcessorNode<K, V> {
      * possibly asynchronous version
      * @return the offset of the most recently fully-processed message
      */
-    public long maybeProcessAsync(final K key, final V value, final Long offset) {
+    public long maybeProcessAsync(final K key, final V value, final long offset) {
         final long startNs = time.nanoseconds();
-        final Long processedOffset = processor.maybeProcessAsync(key, value, offset);
+        final long processedOffset = processor.maybeProcessAsync(key, value, offset);
         nodeMetrics.nodeProcessTimeSensor.record(time.nanoseconds() - startNs);
 
         return processedOffset;

@@ -35,10 +35,11 @@ public class TimestampedCacheFlushListenerTest {
         expect(context.currentNode()).andReturn(null).anyTimes();
         context.setCurrentNode(null);
         context.setCurrentNode(null);
-        context.forward(
+        expect(context.forward(
             "key",
             new Change<>("newValue", "oldValue"),
-            To.all().withTimestamp(42L));
+            To.all().withTimestamp(42L)))
+            .andReturn(1L);
         expectLastCall();
         replay(context);
 
@@ -57,10 +58,11 @@ public class TimestampedCacheFlushListenerTest {
         expect(context.currentNode()).andReturn(null).anyTimes();
         context.setCurrentNode(null);
         context.setCurrentNode(null);
-        context.forward(
+        expect(context.forward(
             "key",
             new Change<>(null, "oldValue"),
-            To.all().withTimestamp(73L));
+            To.all().withTimestamp(73L)))
+            .andReturn(1L);
         expectLastCall();
         replay(context);
 

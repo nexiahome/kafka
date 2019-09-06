@@ -111,7 +111,7 @@ public class GlobalProcessorContextImplTest {
         expectLastCall();
 
         replay(child, recordContext);
-        globalContext.forward(null, null);
+        expect(globalContext.forward(null, null)).andReturn(1L);
         verify(child, recordContext);
     }
 

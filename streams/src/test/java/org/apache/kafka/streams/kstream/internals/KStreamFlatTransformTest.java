@@ -30,6 +30,7 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.Collections;
 
+import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertTrue;
 
 public class KStreamFlatTransformTest extends EasyMockSupport {
@@ -70,9 +71,11 @@ public class KStreamFlatTransformTest extends EasyMockSupport {
         processor.init(context);
         EasyMock.reset(transformer);
 
-        EasyMock.expect(transformer.transform(inputKey, inputValue)).andReturn(outputRecords);
+        expect(transformer.transform(inputKey, inputValue)).andReturn(outputRecords);
+        long offset = 0L;
         for (final KeyValue<Integer, Integer> outputRecord : outputRecords) {
-            context.forward(outputRecord.key, outputRecord.value);
+            expect(context.forward(outputRecord.key, outputRecord.value)).andReturn(offset);
+            offset++;
         }
         replayAll();
 
@@ -86,7 +89,7 @@ public class KStreamFlatTransformTest extends EasyMockSupport {
         processor.init(context);
         EasyMock.reset(transformer);
 
-        EasyMock.expect(transformer.transform(inputKey, inputValue))
+        expect(transformer.transform(inputKey, inputValue))
             .andReturn(Collections.<KeyValue<Integer, Integer>>emptyList());
         replayAll();
 
@@ -100,7 +103,7 @@ public class KStreamFlatTransformTest extends EasyMockSupport {
         processor.init(context);
         EasyMock.reset(transformer);
 
-        EasyMock.expect(transformer.transform(inputKey, inputValue))
+        expect(transformer.transform(inputKey, inputValue))
             .andReturn(null);
         replayAll();
 
@@ -126,7 +129,7 @@ public class KStreamFlatTransformTest extends EasyMockSupport {
         final KStreamFlatTransform<Number, Number, Integer, Integer> processorSupplier =
             new KStreamFlatTransform<>(transformerSupplier);
 
-        EasyMock.expect(transformerSupplier.get()).andReturn(transformer);
+        expect(transformerSupplier.get()).andReturn(transformer);
         replayAll();
 
         final Processor<Number, Number> processor = processorSupplier.get();

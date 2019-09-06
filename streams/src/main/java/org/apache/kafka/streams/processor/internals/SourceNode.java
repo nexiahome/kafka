@@ -89,8 +89,8 @@ public class SourceNode<K, V> extends ProcessorNode<K, V> {
     }
 
     @Override
-    public long maybeProcessAsync(final K key, final V value, final Long offset) {
-        final Long processedOffset = context.forward(key, value);
+    public long maybeProcessAsync(final K key, final V value, final long offset) {
+        final long processedOffset = context.forward(key, value);
         sourceNodeForwardSensor().record();
         return processedOffset;
     }

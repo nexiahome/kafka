@@ -34,10 +34,11 @@ public class SessionCacheFlushListenerTest {
         expect(context.currentNode()).andReturn(null).anyTimes();
         context.setCurrentNode(null);
         context.setCurrentNode(null);
-        context.forward(
+        expect(context.forward(
             new Windowed<>("key", new SessionWindow(21L, 73L)),
             new Change<>("newValue", "oldValue"),
-            To.all().withTimestamp(73L));
+            To.all().withTimestamp(73L)))
+            .andReturn(1L);
         expectLastCall();
         replay(context);
 

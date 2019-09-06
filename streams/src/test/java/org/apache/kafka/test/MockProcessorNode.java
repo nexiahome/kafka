@@ -67,7 +67,7 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
     }
 
     @Override
-    public long maybeProcessAsync(K key, V value, Long offset) {
+    public long maybeProcessAsync(K key, V value, long offset) {
         Long processedOffset = processor().maybeProcessAsync(key, value, offset);
         if (overrideAsyncReturn) {
             processedOffset = overrideAsyncReturnValue;
