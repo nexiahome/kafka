@@ -33,7 +33,6 @@ import java.util.Collections;
 
 import static org.easymock.EasyMock.anyString;
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.mock;
 import static org.easymock.EasyMock.replay;
 import static org.easymock.EasyMock.verify;
@@ -95,6 +94,9 @@ public class GlobalProcessorContextImplTest {
         replay(processorNode);
 
         recordContext = mock(ProcessorRecordContext.class);
+        expect(recordContext.offset())
+            .andReturn(1L)
+            .anyTimes();
         globalContext.setRecordContext(recordContext);
     }
 
@@ -107,11 +109,11 @@ public class GlobalProcessorContextImplTest {
     @SuppressWarnings("unchecked")
     @Test
     public void shouldForwardToSingleChild() {
-        child.process(null, null);
-        expectLastCall();
+        expect(child.maybeProcessAsync(null, null, 1L))
+            .andReturn(1L);
 
         replay(child, recordContext);
-        expect(globalContext.forward(null, null)).andReturn(1L);
+        globalContext.forward(null, null);
         verify(child, recordContext);
     }
 

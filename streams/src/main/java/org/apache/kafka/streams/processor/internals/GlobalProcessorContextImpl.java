@@ -75,7 +75,7 @@ public class GlobalProcessorContextImpl extends AbstractProcessorContext {
     @Override
     public <K, V> long forward(final K key, final V value) {
         final ProcessorNode previousNode = currentNode();
-        Long lastProcessedOffset = recordContext().offset();
+        Long lastProcessedOffset = offset();
         try {
             for (final ProcessorNode child : (List<ProcessorNode<K, V>>) currentNode().children()) {
                 setCurrentNode(child);

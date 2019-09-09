@@ -37,6 +37,7 @@ public class WordCountProcessorTest {
     @Test
     public void test() {
         final MockProcessorContext context = new MockProcessorContext();
+        context.setOffset(1L);
 
         // Create, initialize, and register the state store.
         final KeyValueStore<String, Integer> store =
