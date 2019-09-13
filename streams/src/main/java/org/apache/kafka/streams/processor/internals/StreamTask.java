@@ -84,6 +84,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
     private Producer<byte[], byte[]> producer;
     private boolean commitRequested = false;
     private boolean transactionInFlight = false;
+    private StampedRecord savedRecord;
 
     protected static final class TaskMetrics {
         final StreamsMetricsImpl metrics;
@@ -349,7 +350,14 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
     @SuppressWarnings("unchecked")
     public boolean process() {
         // get the next record to process
-        final StampedRecord record = partitionGroup.nextRecord(recordInfo);
+        final StampedRecord record;
+        if (savedRecord == null) {
+            record = partitionGroup.nextRecord(recordInfo);
+        } else {
+            record = savedRecord;
+            savedRecord = null;
+        }
+        boolean didProcess = false;
 
         // if there is no record to process, return immediately
         if (record == null) {
@@ -368,7 +376,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
 
             log.trace("Completed processing one record [{}]", record);
 
-            handleProcessingResult(partition, result);
+            didProcess = handleProcessingResult(record, partition, result);
 
             // after processing this record, if its partition queue's buffered size has been
             // decreased to the threshold, we can then resume the consumption on this partition
@@ -392,15 +400,19 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
             processorContext.setCurrentNode(null);
         }
 
-        return true;
+        return didProcess;
     }
 
-    private void handleProcessingResult(final TopicPartition partition, final AsyncProcessingResult result) {
+    private boolean handleProcessingResult(
+        final StampedRecord record,
+        final TopicPartition partition, final AsyncProcessingResult result) {
+        boolean didProcess = false;
         switch (result.getStatus()) {
             case OFFSET_NOT_UPDATED:
                 // do nothing? Not sure what to do here
                 break;
             case ASYNC_PAUSE:
+                this.savedRecord = record;
                 // TODO: save off the record to be retried later.
                 break;
             case OFFSET_UPDATED:
@@ -409,7 +421,10 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
                     consumedOffsets.put(partition, result.getLastProcessedOffset());
                     commitNeeded = true;
                 }
+                didProcess = true;
         }
+
+        return didProcess;
     }
 
     private String getStacktraceString(final KafkaException e) {

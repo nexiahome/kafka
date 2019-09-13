@@ -33,7 +33,7 @@ public class AsyncProcessingResult {
         this.lastProcessedOffset = offset;
     }
 
-    AsyncProcessingResult(final Status status) {
+    public AsyncProcessingResult(final Status status) {
         this.status = status;
         this.lastProcessedOffset = -1;
     }

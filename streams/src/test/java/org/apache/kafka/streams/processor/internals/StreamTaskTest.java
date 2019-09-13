@@ -16,6 +16,31 @@
  */
 package org.apache.kafka.streams.processor.internals;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
+import static org.apache.kafka.common.utils.Utils.mkEntry;
+import static org.apache.kafka.common.utils.Utils.mkMap;
+import static org.apache.kafka.common.utils.Utils.mkProperties;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.MockConsumer;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
@@ -42,6 +67,8 @@ import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.DefaultProductionExceptionHandler;
 import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.errors.TaskMigratedException;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
 import org.apache.kafka.streams.processor.StateRestoreListener;
@@ -60,32 +87,6 @@ import org.apache.kafka.test.TestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
-
-import static java.util.Arrays.asList;
-import static java.util.Collections.singletonList;
-import static org.apache.kafka.common.utils.Utils.mkEntry;
-import static org.apache.kafka.common.utils.Utils.mkMap;
-import static org.apache.kafka.common.utils.Utils.mkProperties;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.nullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class StreamTaskTest {
 
@@ -389,6 +390,62 @@ public class StreamTaskTest {
         assertEquals(3, source1.numReceived);
         assertEquals(3, source2.numReceived);
     }
+
+    @Test
+    public void shouldNotSetCommitNeededWhenProcessorReturnsOffsetNotUpdated() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeTopology();
+
+        task.addRecords(partition1, asList(
+            getConsumerRecord(partition1, 10)
+        ));
+
+        try {
+            // force the node to always return the same offset
+            // so that it won't try to commit the second time.
+            source1.overrideAsyncResult(new AsyncProcessingResult(Status.OFFSET_NOT_UPDATED));
+
+            // first time through, the maybeProcessAsync will return a
+            // value that should not trigger the task to need a commit
+            assertFalse(task.commitNeeded());
+        } finally {
+            source1.resetAsyncOverride();
+        }
+
+    }
+
+    @Test
+    public void shouldRetryRecordsWhenProcessingReturnsAsyncPause() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeTopology();
+
+        task.addRecords(partition1, asList(
+            getConsumerRecord(partition1, 10),
+            getConsumerRecord(partition1, 20)
+        ));
+
+        try {
+            // force the node to always return the same offset
+            // so that it won't try to commit the second time.
+            source1.overrideAsyncResult(new AsyncProcessingResult(Status.ASYNC_PAUSE));
+
+            // first time through, the maybeProcessAsync will not process
+            // the record
+            assertFalse(task.process());
+            assertFalse(task.commitNeeded());
+            assertEquals(0, source1.numReceived);
+
+            source1.resetAsyncOverride();
+            // after resetting the override, it should try to process the first record again.
+            assertTrue(task.process());
+            assertTrue(task.commitNeeded());
+            assertEquals(1, source1.numReceived);
+            assertEquals(10L, source1.offsets.get(0).longValue());
+        } finally {
+            source1.resetAsyncOverride();
+        }
+    }
+
 
     @Test
     public void shouldNotSetCommitNeededWhenProcessingAsync() {
