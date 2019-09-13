@@ -28,6 +28,8 @@ import org.apache.kafka.streams.kstream.Initializer;
 import org.apache.kafka.streams.kstream.Merger;
 import org.apache.kafka.streams.kstream.SessionWindows;
 import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.To;
 import org.apache.kafka.streams.processor.internals.MockStreamsMetrics;
@@ -102,11 +104,11 @@ public class KStreamSessionWindowAggregateProcessorTest {
             new ThreadCache(new LogContext("testCache "), 100000, metrics)
         ) {
             @Override
-            public <K, V> long forward(final K key, final V value, final To to) {
+            public <K, V> AsyncProcessingResult forward(final K key, final V value, final To to) {
                 toInternal.update(to);
                 results.add(new KeyValueTimestamp<>(key, value, toInternal.timestamp()));
 
-                return offset();
+                return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
             }
         };
 

@@ -17,6 +17,8 @@
 package org.apache.kafka.streams.kstream.internals;
 
 import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.To;
@@ -65,13 +67,13 @@ public class SessionTupleForwarderTest {
                 new Windowed<>("key", new SessionWindow(21L, 42L)),
                 new Change<>("value", "oldValue"),
                 To.all().withTimestamp(42L)))
-                .andReturn(10L);
+                .andReturn(new AsyncProcessingResult(Status.OFFSET_UPDATED, 10L));
         } else {
             expect(context.forward(
                 new Windowed<>("key", new SessionWindow(21L, 42L)),
                 new Change<>("value", null),
                 To.all().withTimestamp(42L)))
-                .andReturn(10L);
+                .andReturn(new AsyncProcessingResult(Status.OFFSET_UPDATED, 10L));
         }
         expectLastCall();
         replay(store, context);

@@ -16,8 +16,20 @@
  */
 package org.apache.kafka.streams.processor.internals;
 
+import static org.apache.kafka.streams.processor.AsyncProcessingResult.Status.OFFSET_UPDATED;
+import static org.easymock.EasyMock.anyString;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.mock;
+import static org.easymock.EasyMock.replay;
+import static org.easymock.EasyMock.verify;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
+
+import java.util.Collections;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.To;
 import org.apache.kafka.streams.state.KeyValueStore;
@@ -28,17 +40,6 @@ import org.apache.kafka.streams.state.WindowStore;
 import org.hamcrest.core.IsInstanceOf;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.Collections;
-
-import static org.easymock.EasyMock.anyString;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.mock;
-import static org.easymock.EasyMock.replay;
-import static org.easymock.EasyMock.verify;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
 
 public class GlobalProcessorContextImplTest {
     private static final String GLOBAL_STORE_NAME = "global-store";
@@ -110,7 +111,7 @@ public class GlobalProcessorContextImplTest {
     @Test
     public void shouldForwardToSingleChild() {
         expect(child.maybeProcessAsync(null, null, 1L))
-            .andReturn(1L);
+            .andReturn(new AsyncProcessingResult(OFFSET_UPDATED, 1L));
 
         replay(child, recordContext);
         globalContext.forward(null, null);

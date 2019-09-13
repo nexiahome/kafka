@@ -23,6 +23,8 @@ import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -218,25 +220,25 @@ public class AbstractProcessorContextTest {
         }
 
         @Override
-        public <K, V> long forward(final K key, final V value) {
-            return offset();
+        public <K, V> AsyncProcessingResult forward(final K key, final V value) {
+            return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
         }
 
         @Override
-        public <K, V> long forward(final K key, final V value, final To to) {
-            return offset();
-        }
-
-        @Override
-        @Deprecated
-        public <K, V> long forward(final K key, final V value, final int childIndex) {
-            return offset();
+        public <K, V> AsyncProcessingResult forward(final K key, final V value, final To to) {
+            return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
         }
 
         @Override
         @Deprecated
-        public <K, V> long forward(final K key, final V value, final String childName) {
-            return offset();
+        public <K, V> AsyncProcessingResult forward(final K key, final V value, final int childIndex) {
+            return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
+        }
+
+        @Override
+        @Deprecated
+        public <K, V> AsyncProcessingResult forward(final K key, final V value, final String childName) {
+            return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
         }
 
         @Override

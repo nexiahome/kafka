@@ -38,6 +38,7 @@ import org.apache.kafka.streams.errors.ProcessorStateException;
 import org.apache.kafka.streams.errors.ProductionExceptionHandler;
 import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.errors.TaskMigratedException;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -363,15 +364,11 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
             log.trace("Start processing one record [{}]", record);
 
             updateProcessorContext(record, currNode);
-            final long committedOffset = currNode.maybeProcessAsync(record.key(), record.value(), record.offset());
+            final AsyncProcessingResult result = currNode.maybeProcessAsync(record.key(), record.value(), record.offset());
 
             log.trace("Completed processing one record [{}]", record);
 
-            // update the consumed offset map after processing is done
-            if (!(consumedOffsets.containsKey(partition) && consumedOffsets.get(partition).equals(committedOffset))) {
-                consumedOffsets.put(partition, committedOffset);
-                commitNeeded = true;
-            }
+            handleProcessingResult(partition, result);
 
             // after processing this record, if its partition queue's buffered size has been
             // decreased to the threshold, we can then resume the consumption on this partition
@@ -396,6 +393,23 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         }
 
         return true;
+    }
+
+    private void handleProcessingResult(final TopicPartition partition, final AsyncProcessingResult result) {
+        switch (result.getStatus()) {
+            case OFFSET_NOT_UPDATED:
+                // do nothing? Not sure what to do here
+                break;
+            case ASYNC_PAUSE:
+                // TODO: save off the record to be retried later.
+                break;
+            case OFFSET_UPDATED:
+                // update the consumed offset map after processing is done
+                if (!(consumedOffsets.containsKey(partition) && consumedOffsets.get(partition).equals(result.getLastProcessedOffset()))) {
+                    consumedOffsets.put(partition, result.getLastProcessedOffset());
+                    commitNeeded = true;
+                }
+        }
     }
 
     private String getStacktraceString(final KafkaException e) {

@@ -19,6 +19,7 @@ package org.apache.kafka.streams.processor;
 import org.apache.kafka.common.annotation.InterfaceStability;
 
 import java.time.Duration;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 
 /**
  * A processor of key-value pair records.
@@ -68,9 +69,9 @@ public interface Processor<K, V> {
      *
      * @return the offset of the most recent consecutively-processed message for this record's TopicPartition
      */
-    default Long maybeProcessAsync(K key, V value, Long offset) {
+    default AsyncProcessingResult maybeProcessAsync(K key, V value, Long offset) {
         process(key, value);
-        return offset;
+        return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset);
     }
 
     /**

@@ -16,11 +16,17 @@
  */
 package org.apache.kafka.streams.processor.internals;
 
+import static org.apache.kafka.streams.internals.ApiUtils.prepareMillisCheckFailMsgPrefix;
+import static org.apache.kafka.streams.processor.AsyncProcessingResult.Status.OFFSET_UPDATED;
+
+import java.time.Duration;
+import java.util.List;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.internals.ApiUtils;
 import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
@@ -39,12 +45,6 @@ import org.apache.kafka.streams.state.WindowStore;
 import org.apache.kafka.streams.state.WindowStoreIterator;
 import org.apache.kafka.streams.state.internals.ThreadCache;
 import org.apache.kafka.streams.state.internals.WrappedStateStore;
-
-import java.time.Duration;
-import java.util.List;
-
-import static org.apache.kafka.common.utils.Utils.min;
-import static org.apache.kafka.streams.internals.ApiUtils.prepareMillisCheckFailMsgPrefix;
 
 public class ProcessorContextImpl extends AbstractProcessorContext implements RecordCollector.Supplier {
 
@@ -129,7 +129,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> long forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value) {
         return forward(key, value, SEND_TO_ALL);
     }
@@ -137,7 +137,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> long forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value,
                                final int childIndex) {
         return forward(
@@ -149,7 +149,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> long forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value,
                                final String childName) {
         return forward(key, value, To.child(childName));
@@ -157,12 +157,13 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> long forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value,
                                final To to) {
         final ProcessorNode previousNode = currentNode();
         final ProcessorRecordContext previousContext = recordContext;
-        long lastProcessedOffset = recordContext.offset();
+        AsyncProcessingResult lastProcessedOffset = new AsyncProcessingResult(OFFSET_UPDATED,
+            recordContext.offset());
 
         try {
             toInternal.update(to);
@@ -179,7 +180,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
             if (sendTo == null) {
                 final List<ProcessorNode<K, V>> children = (List<ProcessorNode<K, V>>) currentNode().children();
                 for (final ProcessorNode child : children) {
-                    lastProcessedOffset = min(forward(child, key, value), lastProcessedOffset);
+                    lastProcessedOffset.merge(forward(child, key, value));
                 }
             } else {
                 final ProcessorNode child = currentNode().getChild(sendTo);
@@ -197,7 +198,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
     }
 
     @SuppressWarnings("unchecked")
-    private <K, V> Long forward(final ProcessorNode child,
+    private <K, V> AsyncProcessingResult forward(final ProcessorNode child,
                                 final K key,
                                 final V value) {
         setCurrentNode(child);

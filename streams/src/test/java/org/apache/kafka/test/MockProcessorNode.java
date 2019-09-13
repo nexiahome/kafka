@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.test;
 
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.internals.InternalProcessorContext;
 import org.apache.kafka.streams.processor.internals.ProcessorNode;
@@ -34,7 +36,7 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
     public boolean initialized;
 
     public boolean overrideAsyncReturn = false;
-    public Long overrideAsyncReturnValue;
+    public AsyncProcessingResult overrideAsyncReturnValue;
 
 
     public MockProcessorNode(final long scheduleInterval) {
@@ -67,13 +69,13 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
     }
 
     @Override
-    public long maybeProcessAsync(K key, V value, long offset) {
-        Long processedOffset = processor().maybeProcessAsync(key, value, offset);
+    public AsyncProcessingResult maybeProcessAsync(K key, V value, long offset) {
+        AsyncProcessingResult processingResult = processor().maybeProcessAsync(key, value, offset);
         if (overrideAsyncReturn) {
-            processedOffset = overrideAsyncReturnValue;
+            processingResult = overrideAsyncReturnValue;
         }
 
-        return processedOffset;
+        return processingResult;
     }
 
     @Override
@@ -84,7 +86,7 @@ public class MockProcessorNode<K, V> extends ProcessorNode<K, V> {
 
     public void overrideAsyncAndReturnOffset(long offset) {
         overrideAsyncReturn = true;
-        overrideAsyncReturnValue = offset;
+        overrideAsyncReturnValue = new AsyncProcessingResult(Status.OFFSET_UPDATED, offset);
     }
 
     public void resetAsyncOverride() {

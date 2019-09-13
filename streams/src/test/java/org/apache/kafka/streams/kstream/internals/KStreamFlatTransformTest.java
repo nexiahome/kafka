@@ -20,6 +20,8 @@ import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.kstream.TransformerSupplier;
 import org.apache.kafka.streams.kstream.internals.KStreamFlatTransform.KStreamFlatTransformProcessor;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.easymock.EasyMock;
@@ -74,7 +76,9 @@ public class KStreamFlatTransformTest extends EasyMockSupport {
         expect(transformer.transform(inputKey, inputValue)).andReturn(outputRecords);
         long offset = 0L;
         for (final KeyValue<Integer, Integer> outputRecord : outputRecords) {
-            expect(context.forward(outputRecord.key, outputRecord.value)).andReturn(offset);
+            expect(context.forward(outputRecord.key, outputRecord.value))
+                .andReturn(new AsyncProcessingResult(
+                    Status.OFFSET_UPDATED, offset));
             offset++;
         }
         replayAll();

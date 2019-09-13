@@ -17,7 +17,10 @@
 package org.apache.kafka.test;
 
 
+import static org.apache.kafka.streams.processor.AsyncProcessingResult.Status.OFFSET_UPDATED;
+
 import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.internals.InternalProcessorContext;
 import org.apache.kafka.streams.processor.internals.SourceNode;
 
@@ -37,7 +40,7 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     public boolean closed;
     public boolean processedSynchronously = true;
     public boolean overrideProcessAsync = false;
-    public long overrideAsyncOffset = -1;
+    public AsyncProcessingResult overrideAsyncResult;
 
     public MockSourceNode(final String[] topics, final Deserializer<K> keyDeserializer, final Deserializer<V> valDeserializer) {
         super(NAME + INDEX.getAndIncrement(), Arrays.asList(topics), keyDeserializer, valDeserializer);
@@ -51,10 +54,12 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     }
 
     @Override
-    public long maybeProcessAsync(final K key, final V value, final long offset) {
+    public AsyncProcessingResult maybeProcessAsync(final K key, final V value, final long offset) {
         process(key, value);
         this.processedSynchronously = false;
-        return overrideProcessAsync ? overrideAsyncOffset : offset;
+
+        return overrideProcessAsync ? overrideAsyncResult :
+            new AsyncProcessingResult(OFFSET_UPDATED, offset);
     }
 
     @Override
@@ -71,7 +76,7 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
 
     public void overrideAsyncAndReturnOffset(long offset) {
         overrideProcessAsync = true;
-        overrideAsyncOffset = offset;
+        overrideAsyncResult = new AsyncProcessingResult(OFFSET_UPDATED, offset);
     }
 
     public void resetAsyncOverride() {

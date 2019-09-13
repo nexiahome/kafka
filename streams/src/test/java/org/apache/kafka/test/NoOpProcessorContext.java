@@ -18,6 +18,8 @@ package org.apache.kafka.test;
 
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -70,26 +72,26 @@ public class NoOpProcessorContext extends AbstractProcessorContext {
     }
 
     @Override
-    public <K, V> long forward(final K key, final V value) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value) {
         forwardedValues.put(key, value);
-        return recordContext().offset();
+        return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
     }
 
     @Override
-    public <K, V> long forward(final K key, final V value, final To to) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final To to) {
         forwardedValues.put(key, value);
-        return recordContext().offset();
+        return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
     }
 
     @Override
     @Deprecated
-    public <K, V> long forward(final K key, final V value, final int childIndex) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final int childIndex) {
         return forward(key, value);
     }
 
     @Override
     @Deprecated
-    public <K, V> long forward(final K key, final V value, final String childName) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final String childName) {
         return forward(key, value);
     }
 

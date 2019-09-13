@@ -30,6 +30,8 @@ import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.ValueMapper;
 import org.apache.kafka.streams.kstream.ValueTransformerWithKey;
 import org.apache.kafka.streams.kstream.ValueTransformerWithKeySupplier;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.internals.ForwardingDisabledProcessorContext;
@@ -159,7 +161,9 @@ public class KTableTransformValuesTest {
         final Processor<String, Change<String>> processor = transformValues.get();
         processor.init(context);
 
-        expect(context.forward("Key", new Change<>("Key->newValue!", null))).andReturn(1L);
+        expect(context.forward("Key", new Change<>("Key->newValue!", null)))
+            .andReturn(new AsyncProcessingResult(
+                Status.OFFSET_UPDATED, 1L));
         expectLastCall();
         replay(context);
 
@@ -177,7 +181,8 @@ public class KTableTransformValuesTest {
         final Processor<String, Change<String>> processor = transformValues.get();
         processor.init(context);
 
-        expect(context.forward("Key", new Change<>("Key->newValue!", "Key->oldValue!"))).andReturn(1L);
+        expect(context.forward("Key", new Change<>("Key->newValue!", "Key->oldValue!"))).andReturn(
+            new AsyncProcessingResult(Status.OFFSET_UPDATED, 1L));
         expectLastCall();
         replay(context);
 

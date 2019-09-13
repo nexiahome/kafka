@@ -20,6 +20,7 @@ import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.streams.errors.StreamsException;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -125,12 +126,12 @@ public class ProcessorNode<K, V> {
      * possibly asynchronous version
      * @return the offset of the most recently fully-processed message
      */
-    public long maybeProcessAsync(final K key, final V value, final long offset) {
+    public AsyncProcessingResult maybeProcessAsync(final K key, final V value, final long offset) {
         final long startNs = time.nanoseconds();
-        final long processedOffset = processor.maybeProcessAsync(key, value, offset);
+        final AsyncProcessingResult result = processor.maybeProcessAsync(key, value, offset);
         nodeMetrics.nodeProcessTimeSensor.record(time.nanoseconds() - startNs);
 
-        return processedOffset;
+        return result;
     }
 
     public void punctuate(final long timestamp, final Punctuator punctuator) {

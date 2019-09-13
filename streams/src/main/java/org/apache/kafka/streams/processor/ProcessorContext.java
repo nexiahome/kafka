@@ -172,18 +172,19 @@ public interface ProcessorContext {
      *
      * @param key key
      * @param value value
+     * @return a value indicating whether or not the downstream processors handled the pair
      */
-    <K, V> long forward(final K key, final V value);
+    <K, V> AsyncProcessingResult forward(final K key, final V value);
 
     /**
      * Forwards a key/value pair to the specified downstream processors.
      * Can be used to set the timestamp of the output record.
-     *
-     * @param key key
+     *  @param key key
      * @param value value
      * @param to the options to use when forwarding
+     * @return
      */
-    <K, V> long forward(final K key, final V value, final To to);
+    <K, V> AsyncProcessingResult forward(final K key, final V value, final To to);
 
     /**
      * Forwards a key/value pair to one of the downstream processors designated by childIndex
@@ -191,10 +192,11 @@ public interface ProcessorContext {
      * @param value value
      * @param childIndex index in list of children of this node
      * @deprecated please use {@link #forward(Object, Object, To)} instead
+     * @return
      */
     // TODO when we remove this method, we can also remove `ProcessorNode#children`
     @Deprecated
-    <K, V> long forward(final K key, final V value, final int childIndex);
+    <K, V> AsyncProcessingResult forward(final K key, final V value, final int childIndex);
 
     /**
      * Forwards a key/value pair to one of the downstream processors designated by the downstream processor name
@@ -202,9 +204,10 @@ public interface ProcessorContext {
      * @param value value
      * @param childName name of downstream processor
      * @deprecated please use {@link #forward(Object, Object, To)} instead
+     * @return
      */
     @Deprecated
-    <K, V> long forward(final K key, final V value, final String childName);
+    <K, V> AsyncProcessingResult forward(final K key, final V value, final String childName);
 
     /**
      * Requests a commit
