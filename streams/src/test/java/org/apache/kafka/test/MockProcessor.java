@@ -105,7 +105,7 @@ public class MockProcessor<K, V> extends AbstractProcessor<K, V> {
     }
 
     @Override
-    public AsyncProcessingResult maybeProcessAsync(K key, V value, Long offset) {
+    public AsyncProcessingResult maybeProcessAsync(K key, V value, long offset) {
         process(key, value);
         return overrideAsyncReturn ? overrideAsyncReturnValue :
             new AsyncProcessingResult(OFFSET_UPDATED, offset);

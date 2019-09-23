@@ -69,7 +69,7 @@ public interface Processor<K, V> {
      *
      * @return the offset of the most recent consecutively-processed message for this record's TopicPartition
      */
-    default AsyncProcessingResult maybeProcessAsync(K key, V value, Long offset) {
+    default AsyncProcessingResult maybeProcessAsync(K key, V value, long offset) {
         if ((key == null) && (value == null)) {
             return new AsyncProcessingResult(Status.OFFSET_NOT_UPDATED, offset);
         }

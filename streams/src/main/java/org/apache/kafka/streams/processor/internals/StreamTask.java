@@ -325,7 +325,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         if (partitionGroup.allPartitionsBuffered()) {
             idleStartTime = RecordQueue.UNKNOWN;
             return true;
-        } else { //if (partitionGroup.numBuffered() > 0) {
+        } else {
             if (idleStartTime == RecordQueue.UNKNOWN) {
                 idleStartTime = now;
             }
