@@ -325,19 +325,18 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         if (partitionGroup.allPartitionsBuffered()) {
             idleStartTime = RecordQueue.UNKNOWN;
             return true;
-        } else if (partitionGroup.numBuffered() > 0) {
+        } else { //if (partitionGroup.numBuffered() > 0) {
             if (idleStartTime == RecordQueue.UNKNOWN) {
                 idleStartTime = now;
             }
 
             if (now - idleStartTime >= maxTaskIdleMs) {
                 taskMetrics.taskEnforcedProcessSensor.record();
+                idleStartTime = RecordQueue.UNKNOWN;
                 return true;
             } else {
                 return false;
             }
-        } else {
-            return false;
         }
     }
 
@@ -351,23 +350,28 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
     public boolean process() {
         // get the next record to process
         final StampedRecord record;
+        StampedRecord nextRecord;
         if (savedRecord == null) {
-            record = partitionGroup.nextRecord(recordInfo);
+            nextRecord = partitionGroup.nextRecord(recordInfo);
         } else {
-            record = savedRecord;
+            nextRecord = savedRecord;
             savedRecord = null;
         }
         boolean didProcess = false;
 
-        // if there is no record to process, return immediately
-        if (record == null) {
-            return false;
+        if (nextRecord == null) {
+            nextRecord = new StampedRecord(DUMMY_RECORD, time.milliseconds());
         }
+        record = nextRecord;
 
         try {
             // process the record by passing to the source node of the topology
             final ProcessorNode currNode = recordInfo.node();
             final TopicPartition partition = recordInfo.partition();
+
+            if (currNode == null) {
+                return false;
+            }
 
             log.trace("Start processing one record [{}]", record);
 

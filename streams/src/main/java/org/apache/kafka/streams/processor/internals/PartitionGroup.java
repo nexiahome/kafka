@@ -63,11 +63,11 @@ public class PartitionGroup {
         RecordQueue queue;
 
         public ProcessorNode node() {
-            return queue.source();
+            return queue == null ? null : queue.source();
         }
 
         public TopicPartition partition() {
-            return queue.partition();
+            return queue == null ? null : queue.partition();
         }
 
         RecordQueue queue() {

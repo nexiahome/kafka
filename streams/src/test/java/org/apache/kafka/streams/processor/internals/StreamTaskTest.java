@@ -776,20 +776,22 @@ public class StreamTaskTest {
 
         task.addRecords(partition1, Collections.singleton(new ConsumerRecord<>(topic1, 1, 0, bytes, bytes)));
 
+        assertTrue(task.isProcessable(time.milliseconds()));
+
         assertFalse(task.isProcessable(time.milliseconds()));
 
         assertFalse(task.isProcessable(time.milliseconds() + 50L));
 
         assertTrue(task.isProcessable(time.milliseconds() + 100L));
-        assertEquals(1.0, metrics.metric(enforcedProcessMetric).metricValue());
+        assertEquals(2.0, metrics.metric(enforcedProcessMetric).metricValue());
 
-        // once decided to enforce, continue doing that
-        assertTrue(task.isProcessable(time.milliseconds() + 101L));
+        // once timeout starts processing, reset timer
+        assertFalse(task.isProcessable(time.milliseconds() + 101L));
         assertEquals(2.0, metrics.metric(enforcedProcessMetric).metricValue());
 
         task.addRecords(partition2, Collections.singleton(new ConsumerRecord<>(topic2, 1, 0, bytes, bytes)));
 
-        assertTrue(task.isProcessable(time.milliseconds() + 130L));
+        assertTrue(task.isProcessable(time.milliseconds() + 200L));
         assertEquals(2.0, metrics.metric(enforcedProcessMetric).metricValue());
 
         // one resumed to normal processing, the timer should be reset
