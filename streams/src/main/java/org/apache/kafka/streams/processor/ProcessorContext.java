@@ -30,7 +30,7 @@ import java.util.Map;
  * Processor context interface.
  */
 @InterfaceStability.Evolving
-public interface ProcessorContext {
+public interface ProcessorContext extends Cloneable {
 
     /**
      * Returns the application id
@@ -286,4 +286,15 @@ public interface ProcessorContext {
      */
     Map<String, Object> appConfigsWithPrefix(final String prefix);
 
+    /**
+     * Clones this context in such a way that the clone is usable exactly as this context is
+     * right now. In particular, if any part of the context may be updated later, this ensures
+     * that the cloned context behaves as the original does at the time of the clone() call.
+     *
+     * Really this just takes {@link Object}#clone(), which is
+     * protected by default, and makes it public. This should also
+     * force implementors of this interface to define it.
+     *
+     */
+    public Object clone();
 }

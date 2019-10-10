@@ -187,6 +187,14 @@ public class MockProcessorContext implements ProcessorContext, RecordCollector.S
             null);
     }
 
+    public Object clone() {
+        try {
+            return super.clone();
+        } catch (final CloneNotSupportedException e) {
+            throw new AssertionError("Can't clone " + this);
+        }
+    }
+
     /**
      * Create a {@link MockProcessorContext} with dummy {@code taskId} and {@code null} {@code stateDir}.
      * Most unit tests using this mock won't need to know the taskId,

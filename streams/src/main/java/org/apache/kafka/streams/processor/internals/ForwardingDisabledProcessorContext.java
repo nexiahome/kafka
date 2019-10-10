@@ -46,6 +46,15 @@ public final class ForwardingDisabledProcessorContext implements ProcessorContex
     }
 
     @Override
+    public Object clone() {
+        try {
+            return super.clone();
+        } catch (final CloneNotSupportedException e) {
+            throw new AssertionError("Can't clone " + this);
+        }
+    }
+
+    @Override
     public String applicationId() {
         return delegate.applicationId();
     }
