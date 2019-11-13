@@ -415,6 +415,36 @@ public class StreamTaskTest {
     }
 
     @Test
+    public void shouldCallAsyncProcessorNodeWithDummyRecordWhenQueuesAreEmpty() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeTopology();
+
+        task.addRecords(partition1, asList(
+                getConsumerRecord(partition1, 10)
+        ));
+
+        task.process(); // set offset for partition
+        task.commit();
+        final int receivedBeforeTest = source1.numReceived;
+
+        task.process(); // processor should be called with empty record
+
+        assertEquals(receivedBeforeTest + 1, source1.numReceived);
+        assertEquals(null, source1.keys.get(source1.keys.size() - 1));
+        assertEquals(null, source1.values.get(source1.values.size() - 1));
+
+    }
+
+    @Test
+    public void shouldNotCallAsyncProcessorNodeWhenNoRecordHasBeenEverReceived() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeTopology();
+        final int receivedBeforeTest = source1.numReceived;
+        task.process(); // processor should not be called with empty record
+        assertEquals(receivedBeforeTest, source1.numReceived);
+    }
+
+    @Test
     public void shouldRetryRecordsWhenProcessingReturnsAsyncPause() {
         task = createStatelessTask(createConfig(false));
         task.initializeTopology();
@@ -463,6 +493,36 @@ public class StreamTaskTest {
             // so that it won't try to commit the second time.
             source1.overrideAsyncAndReturnOffset(1);
 
+            // first time through, the maybeProcessAsync will return a
+            // value that should trigger the task to need a commit
+            assertTrue(task.process());
+            assertTrue(task.commitNeeded());
+
+            task.commit();
+            assertFalse(task.commitNeeded());
+
+            // After this, we can process all we want, but the ProcessorNode
+            // will return the same offset, so we don't need to commit again
+            // until it changes.
+            assertTrue(task.process());
+            assertFalse(task.commitNeeded());
+        } finally {
+            source1.resetAsyncOverride();
+        }
+    }
+
+    @Test
+    public void shouldNotSetCommitNeededIfOffsetDecreasesWhenProcessingAsync() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeTopology();
+
+
+        task.addRecords(partition1, asList(
+            getConsumerRecord(partition1, 10),
+            getConsumerRecord(partition1, 6)
+        ));
+
+        try {
             // first time through, the maybeProcessAsync will return a
             // value that should trigger the task to need a commit
             assertTrue(task.process());

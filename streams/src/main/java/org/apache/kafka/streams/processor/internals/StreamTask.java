@@ -340,6 +340,15 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         }
     }
 
+    void addDummyMessagesToEmptyQueues() {
+        partitionGroup.partitions().stream()
+                .filter(p -> partitionGroup.numBuffered(p) == 0) // find partitions with no messages
+                .forEach(p -> {
+                    final Long lastOffset = consumedOffsets.getOrDefault(p, -1L);
+                    addRecords(p, singleton(new ConsumerRecord<>(p.topic(), p.partition(), lastOffset, null, null)));
+                });
+    }
+
     /**
      * Process one record.
      *
@@ -360,7 +369,9 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         boolean didProcess = false;
 
         if (nextRecord == null) {
-            nextRecord = new StampedRecord(DUMMY_RECORD, time.milliseconds());
+
+            addDummyMessagesToEmptyQueues();
+            nextRecord = partitionGroup.nextRecord(recordInfo);
         }
         record = nextRecord;
 
@@ -421,7 +432,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
                 break;
             case OFFSET_UPDATED:
                 // update the consumed offset map after processing is done
-                if (!(consumedOffsets.containsKey(partition) && consumedOffsets.get(partition).equals(result.getLastProcessedOffset()))) {
+                if (!consumedOffsets.containsKey(partition) || consumedOffsets.get(partition) < result.getLastProcessedOffset()) {
                     consumedOffsets.put(partition, result.getLastProcessedOffset());
                     commitNeeded = true;
                 }
