@@ -140,6 +140,10 @@ public class ProcessorNode<K, V> {
         nodeMetrics.nodePunctuateTimeSensor.record(time.nanoseconds() - startNs);
     }
 
+    public boolean acceptsOffsetCheckMessage() {
+        return true;
+    }
+
     /**
      * @return a string representation of this node, useful for debugging.
      */

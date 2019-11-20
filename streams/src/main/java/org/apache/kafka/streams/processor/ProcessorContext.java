@@ -32,6 +32,8 @@ import java.util.Map;
 @InterfaceStability.Evolving
 public interface ProcessorContext extends Cloneable {
 
+    public static String OFFSET_CHECK_RECORD_HEADER = "offsetCheckRecord";
+
     /**
      * Returns the application id
      *

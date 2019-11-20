@@ -111,6 +111,11 @@ public class SinkNode<K, V> extends ProcessorNode<K, V> {
         return new AsyncProcessingResult(OFFSET_UPDATED, offset);
     }
 
+    @Override
+    public boolean acceptsOffsetCheckMessage() {
+        return false;
+    }
+
     /**
      * @return a string representation of this node, useful for debugging.
      */

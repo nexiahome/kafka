@@ -176,19 +176,22 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
                     recordContext.headers());
             }
 
+            final boolean offsetCheckRecord = recordContext.headers().lastHeader(ProcessorContext.OFFSET_CHECK_RECORD_HEADER) != null;
             final String sendTo = toInternal.child();
             if (sendTo == null) {
                 final List<ProcessorNode<K, V>> children = (List<ProcessorNode<K, V>>) currentNode().children();
-                for (final ProcessorNode child : children) {
-                    lastProcessedOffset.merge(forward(child, key, value));
-                }
+                lastProcessedOffset = children.stream()
+                        .filter(child -> !offsetCheckRecord || child.acceptsOffsetCheckMessage())
+                        .map(child -> forward(child, key, value))
+                        .reduce((offset1, offset2) -> offset1.merge(offset2))
+                        .orElse(lastProcessedOffset);
             } else {
                 final ProcessorNode child = currentNode().getChild(sendTo);
                 if (child == null) {
                     throw new StreamsException("Unknown downstream node: " + sendTo
                         + " either does not exist or is not connected to this processor.");
                 }
-                lastProcessedOffset = forward(child, key, value);
+                lastProcessedOffset = !offsetCheckRecord || child.acceptsOffsetCheckMessage() ? forward(child, key, value) : lastProcessedOffset;
             }
         } finally {
             recordContext = previousContext;

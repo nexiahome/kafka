@@ -415,7 +415,7 @@ public class StreamTaskTest {
     }
 
     @Test
-    public void shouldCallAsyncProcessorNodeWithDummyRecordWhenQueuesAreEmpty() {
+    public void shouldCallAsyncProcessorNodeWithOffsetCheckRecordWhenQueuesAreEmpty() {
         task = createStatelessTask(createConfig(false));
         task.initializeTopology();
 
@@ -427,7 +427,7 @@ public class StreamTaskTest {
         task.commit();
         final int receivedBeforeTest = source1.numReceived;
 
-        task.process(); // processor should be called with empty record
+        task.checkOffset(); // processor should be called with empty record
 
         assertEquals(receivedBeforeTest + 1, source1.numReceived);
         assertEquals(null, source1.keys.get(source1.keys.size() - 1));
@@ -478,23 +478,23 @@ public class StreamTaskTest {
 
 
     @Test
-    public void shouldNotSetCommitNeededWhenProcessingAsync() {
+    public void shouldNotSetCommitNeededOnRepeatedOffsetWhenProcessingAsync() {
         task = createStatelessTask(createConfig(false));
         task.initializeTopology();
 
 
         task.addRecords(partition1, asList(
             getConsumerRecord(partition1, 10),
+            getConsumerRecord(partition1, 15),
             getConsumerRecord(partition1, 20)
         ));
 
         try {
-            // force the node to always return the same offset
-            // so that it won't try to commit the second time.
-            source1.overrideAsyncAndReturnOffset(1);
+            // force to return the same offset every time
+            source1.overrideAsyncAndReturnOffset(10);
 
             // first time through, the maybeProcessAsync will return a
-            // value that should trigger the task to need a commit
+            // value that should trigger the task should need a commit
             assertTrue(task.process());
             assertTrue(task.commitNeeded());
 
@@ -836,22 +836,20 @@ public class StreamTaskTest {
 
         task.addRecords(partition1, Collections.singleton(new ConsumerRecord<>(topic1, 1, 0, bytes, bytes)));
 
-        assertTrue(task.isProcessable(time.milliseconds()));
-
         assertFalse(task.isProcessable(time.milliseconds()));
 
         assertFalse(task.isProcessable(time.milliseconds() + 50L));
 
         assertTrue(task.isProcessable(time.milliseconds() + 100L));
-        assertEquals(2.0, metrics.metric(enforcedProcessMetric).metricValue());
+        assertEquals(1.0, metrics.metric(enforcedProcessMetric).metricValue());
 
-        // once timeout starts processing, reset timer
-        assertFalse(task.isProcessable(time.milliseconds() + 101L));
+        // once decided to enforce, continue doing that
+        assertTrue(task.isProcessable(time.milliseconds() + 101L));
         assertEquals(2.0, metrics.metric(enforcedProcessMetric).metricValue());
 
         task.addRecords(partition2, Collections.singleton(new ConsumerRecord<>(topic2, 1, 0, bytes, bytes)));
 
-        assertTrue(task.isProcessable(time.milliseconds() + 200L));
+        assertTrue(task.isProcessable(time.milliseconds() + 130L));
         assertEquals(2.0, metrics.metric(enforcedProcessMetric).metricValue());
 
         // one resumed to normal processing, the timer should be reset

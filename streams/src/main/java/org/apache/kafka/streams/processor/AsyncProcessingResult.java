@@ -46,7 +46,7 @@ public class AsyncProcessingResult {
         return status;
     }
 
-    public void merge(final AsyncProcessingResult other) {
+    public AsyncProcessingResult merge(final AsyncProcessingResult other) {
         if (status.equals(Status.OFFSET_NOT_UPDATED) || other.getStatus().equals(Status.OFFSET_NOT_UPDATED)) {
             status = Status.OFFSET_NOT_UPDATED;
         } else if (status.equals(Status.ASYNC_PAUSE) || other.getStatus().equals(Status.ASYNC_PAUSE)) {
@@ -55,5 +55,6 @@ public class AsyncProcessingResult {
             status = Status.OFFSET_UPDATED;
         }
         this.lastProcessedOffset = min(this.lastProcessedOffset, other.getLastProcessedOffset());
+        return this;
     }
 }

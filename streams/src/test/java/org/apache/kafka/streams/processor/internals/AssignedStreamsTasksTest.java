@@ -365,6 +365,7 @@ public class AssignedStreamsTasksTest {
     public void shouldNotProcessUnprocessableTasks() {
         mockTaskInitialization();
         EasyMock.expect(t1.isProcessable(0L)).andReturn(false);
+        EasyMock.expect(t1.shouldCheckOffset(0L)).andReturn(false);
         EasyMock.replay(t1);
         addAndInitTask();
 
