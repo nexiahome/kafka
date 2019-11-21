@@ -82,6 +82,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
     private final RecordCollector recordCollector;
     private final PartitionGroup.RecordInfo recordInfo;
     private final Map<TopicPartition, Long> consumedOffsets;
+    private final Map<TopicPartition, Long> earliestOffsets;
     private final PunctuationQueue streamTimePunctuationQueue;
     private final PunctuationQueue systemTimePunctuationQueue;
     private final ProducerSupplier producerSupplier;
@@ -223,6 +224,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         maxTaskOffsetCheckIdleMs = config.getLong(StreamsConfig.MAX_TASK_OFFSET_CHECK_IDLE_MS_CONFIG);
         maxBufferedSize = config.getInt(StreamsConfig.BUFFERED_RECORDS_PER_PARTITION_CONFIG);
 
+        earliestOffsets = new HashMap<>();
         // initialize the consumed and committed offset cache
         consumedOffsets = new HashMap<>();
 
@@ -371,8 +373,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         }
     }
 
-    private boolean addOffsetCheckMessageToPartition(final TopicPartition p) {
-        final Long lastOffset = consumedOffsets.get(p);
+    private boolean addOffsetCheckMessageToPartition(final TopicPartition p, final long lastOffset) {
         if (log.isTraceEnabled()) {
             log.trace("Add check offset message topic {} partition {} offset {}", p.topic(), p.partition(), consumedOffsets.get(p));
         }
@@ -391,19 +392,25 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         return true;
     }
 
-    boolean addOffsetCheckMessagesToEmptyQueues() {
+    private boolean addOffsetCheckMessagesToEmptyQueues() {
         if (log.isTraceEnabled()) {
-            log.trace("May be add Dummy Messages to Queues for {} partitions", consumedOffsets.size());
+            log.trace("May be add Offset Check Messages to Queues for {} partitions", consumedOffsets.size());
         }
         return partitionGroup.partitions().stream()
-            .filter(p -> partitionGroup.numBuffered(p) == 0 && consumedOffsets.containsKey(p)) // find partitions with no messages
-            .map(p -> addOffsetCheckMessageToPartition(p))
+             // find partitions with no buffered messages and an available record offset
+            .filter(p -> partitionGroup.numBuffered(p) == 0 && (earliestOffsets.containsKey(p) || consumedOffsets.containsKey(p)))
+            .map(p -> addOffsetCheckMessageToPartition(p, consumedOffsets.getOrDefault(p, earliestOffsets.get(p))))
             .count() > 0;
     }
 
-    private void initializeConsumedOffsetsIfNeeded(final StampedRecord record) {
-        if (consumedOffsets != null && recordInfo != null && record != null && !consumedOffsets.containsKey(recordInfo.partition())) {
-            consumedOffsets.put(recordInfo.partition(), record.offset() - 1);
+    /*
+    * Save the offset of the very first record processed for a partition.
+    * It is used later as offset for OffsetCheckMessage. This is only useful until consumedOffset is populated for the partition
+    * Once consumedOffset is set, its offset will be used for OffsetCheckMessage
+    * */
+    private void initializeEarliestOffsetsIfNeeded(final StampedRecord record) {
+        if (earliestOffsets != null && recordInfo != null && record != null && !earliestOffsets.containsKey(recordInfo.partition())) {
+            earliestOffsets.put(recordInfo.partition(), record.offset());
         }
     }
 
@@ -434,7 +441,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         boolean didProcess = false;
 
         try {
-            initializeConsumedOffsetsIfNeeded(record);
+            initializeEarliestOffsetsIfNeeded(record);
             // process the record by passing to the source node of the topology
             final ProcessorNode currNode = recordInfo.node();
             final TopicPartition partition = recordInfo.partition();
