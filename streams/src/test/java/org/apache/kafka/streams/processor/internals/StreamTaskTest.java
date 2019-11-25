@@ -21,6 +21,7 @@ import static java.util.Collections.singletonList;
 import static org.apache.kafka.common.utils.Utils.mkEntry;
 import static org.apache.kafka.common.utils.Utils.mkMap;
 import static org.apache.kafka.common.utils.Utils.mkProperties;
+import static org.apache.kafka.streams.processor.internals.StreamTask.OFFSET_CHECK_MESSAGE_HEADERS;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
@@ -35,6 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -867,6 +869,91 @@ public class StreamTaskTest {
 
 
     @Test
+    public void shouldNotCheckOffsetIfAPartitionIsBuffered() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeStateStores();
+        task.initializeTopology();
+
+        assertFalse(task.shouldCheckOffset(0L));
+
+        final byte[] bytes = ByteBuffer.allocate(4).putInt(1).array();
+
+        task.addRecords(partition1, Collections.singleton(new ConsumerRecord<>(topic1, 1, 0, bytes, bytes)));
+
+        assertFalse(task.shouldCheckOffset(0L));
+
+        task.addRecords(partition2, Collections.singleton(new ConsumerRecord<>(topic2, 1, 0, bytes, bytes)));
+
+        assertFalse(task.shouldCheckOffset(0L));
+    }
+
+    @Test
+    public void shouldNotCheckOffsetIfItsTooSoon() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeStateStores();
+        task.initializeTopology();
+
+        assertFalse(task.shouldCheckOffset(0L));
+    }
+
+    @Test
+    public void shouldNotCheckOffsetAfterIdleTime() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeStateStores();
+        task.initializeTopology();
+
+        final long now = time.milliseconds();
+        assertFalse(task.shouldCheckOffset(now));
+
+        final long later = now + 1001;
+        assertTrue(task.shouldCheckOffset(later));
+    }
+
+    @Test
+    public void shouldAddOffsetCheckMessagesToNonBufferedPartitions() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeStateStores();
+        task.initializeTopology();
+
+        // add record to each partition so they are initialized
+        final byte[] bytes = ByteBuffer.allocate(4).putInt(1).array();
+        task.addRecords(partition1, Collections.singleton(new ConsumerRecord<>(topic1, 1, 0, bytes, bytes)));
+        task.addRecords(partition2, Collections.singleton(new ConsumerRecord<>(topic2, 1, 0, bytes, bytes)));
+        // process both partitions so they become empty
+        assertTrue(task.process());
+        assertTrue(task.process());
+        assertEquals(0, task.numBuffered());
+
+        // offsetCheck records should be added to both partitions
+        assertTrue(task.addOffsetCheckMessagesToEmptyQueues());
+        assertEquals(2, task.numBuffered());
+
+        assertTrue(task.process());
+        final int lastMessageIndex = source1.keys.size() - 1;
+        assertEquals(null, source1.keys.get(lastMessageIndex)); // offsetCheckMessage has null key
+        assertEquals(null, source1.values.get(lastMessageIndex)); //offsetCheckMessage has null value
+
+    }
+
+    @Test
+    public void shouldNotAddOffsetCheckMessagesToBufferedPartitions() {
+        task = createStatelessTask(createConfig(false));
+        task.initializeStateStores();
+        task.initializeTopology();
+
+        // add record to each partition so they are initialized
+        final byte[] bytes = ByteBuffer.allocate(4).putInt(1).array();
+        task.addRecords(partition1, Collections.singleton(new ConsumerRecord<>(topic1, 1, 0, bytes, bytes)));
+        task.addRecords(partition2, Collections.singleton(new ConsumerRecord<>(topic2, 1, 0, bytes, bytes)));
+        final int numBufferedMessages = task.numBuffered();
+
+        // offsetCheck records should not add records. They should stay at 2,  added to both partitions
+        assertFalse(task.addOffsetCheckMessagesToEmptyQueues());
+        assertEquals(numBufferedMessages, task.numBuffered());
+    }
+
+
+    @Test
     public void shouldPunctuateSystemTimeWhenIntervalElapsed() {
         task = createStatelessTask(createConfig(false));
         task.initializeStateStores();
@@ -1066,6 +1153,40 @@ public class StreamTaskTest {
         task.initializeTopology();
         task.punctuate(processorStreamTime, 5, PunctuationType.STREAM_TIME, punctuator);
         assertThat(((ProcessorContextImpl) task.context()).currentNode(), nullValue());
+    }
+
+    @Test
+    public void shouldNotSuppressOffsetCheckMessage() {
+        final MockProcessorNode<Integer, Integer> processorNode = new MockProcessorNode<Integer, Integer>(10L) {
+            @Override
+            public boolean acceptsOffsetCheckMessage() {
+                return true;
+            }
+        };
+
+        task = createOffsetCheckTask(createConfig(false), processorNode);
+        task.initializeTopology();
+        task.addRecords(partition1, Collections.singleton(getOffsetRecord(partition1, 1)));
+        task.process();
+
+        assertEquals(1, processorNode.mockProcessor.processed.size());
+    }
+
+    @Test
+    public void shouldSuppressOffsetCheckMessage() {
+        final MockProcessorNode<Integer, Integer> processorNode = new MockProcessorNode<Integer, Integer>(10L) {
+            @Override
+            public boolean acceptsOffsetCheckMessage() {
+                return false;
+            }
+        };
+
+        task = createOffsetCheckTask(createConfig(false), processorNode);
+        task.initializeTopology();
+        task.addRecords(partition1, Collections.singleton(getOffsetRecord(partition1, 1)));
+        task.process();
+
+        assertEquals(0, processorNode.mockProcessor.processed.size());
     }
 
     @Test(expected = IllegalStateException.class)
@@ -1630,6 +1751,37 @@ public class StreamTaskTest {
         assertEquals(1, producer.history().size());
     }
 
+    private StreamTask createOffsetCheckTask(final StreamsConfig streamsConfig, final ProcessorNode offsetSupportedNode) {
+        final SourceNode<Integer, Integer> localSource1 = new SourceNode<Integer, Integer>("MOCK-SOURCE-1", Arrays.asList(new String[]{topic1}), intDeserializer, intDeserializer) {
+            @Override
+            public AsyncProcessingResult maybeProcessAsync(final Integer key, final Integer value, final long offset) {
+                return super.maybeProcessAsync(key, value, offset);
+            }
+        };
+
+        final ProcessorTopology topology = withSources(
+                asList(localSource1, source2, offsetSupportedNode),
+                mkMap(mkEntry(topic1, localSource1), mkEntry(topic2, source2))
+        );
+
+        localSource1.addChild(offsetSupportedNode);
+
+        task = new StreamTask(
+            taskId00,
+            partitions,
+            topology,
+            consumer,
+            changelogReader,
+            streamsConfig,
+            streamsMetrics,
+            stateDirectory,
+            null,
+            time,
+            () -> producer = new MockProducer<>(false, bytesSerializer, bytesSerializer),
+            metrics.sensor("dummy"));
+        return task;
+    }
+
     private StreamTask createStatefulTask(final StreamsConfig config, final boolean logged) {
         final ProcessorTopology topology = ProcessorTopologyFactories.with(
             asList(source1, source2),
@@ -1730,6 +1882,21 @@ public class StreamTaskTest {
                 throw new RuntimeException("KABOOM!");
             }
         };
+    }
+
+    private ConsumerRecord<byte[], byte[]> getOffsetRecord(final TopicPartition topicPartition, final long offset) {
+        return new ConsumerRecord<>(
+                topicPartition.topic(),
+                topicPartition.partition(),
+                offset,
+                offset, // use the offset as the timestamp
+                TimestampType.CREATE_TIME,
+                0L,
+                0,
+                0,
+                null,
+                null,
+                OFFSET_CHECK_MESSAGE_HEADERS);
     }
 
     private ConsumerRecord<byte[], byte[]> getConsumerRecord(final TopicPartition topicPartition, final long offset) {
