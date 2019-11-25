@@ -71,7 +71,7 @@ import static org.apache.kafka.streams.kstream.internals.metrics.Sensors.recordL
 public class StreamTask extends AbstractTask implements ProcessorNodePunctuator {
 
     private static final ConsumerRecord<Object, Object> DUMMY_RECORD = new ConsumerRecord<>(ProcessorContextImpl.NONEXIST_TOPIC, -1, -1L, null, null);
-    private static final RecordHeaders OFFSET_CHECK_MESSAGE_HEADERS = new RecordHeaders(new Header[] {new RecordHeader(ProcessorContext.OFFSET_CHECK_RECORD_HEADER, new byte[] {(byte) 1})});
+    public static final RecordHeaders OFFSET_CHECK_MESSAGE_HEADERS = new RecordHeaders(new Header[] {new RecordHeader(ProcessorContext.OFFSET_CHECK_RECORD_HEADER, new byte[] {(byte) 1})});
 
     private final Time time;
     private final long maxTaskIdleMs;
@@ -392,7 +392,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         return true;
     }
 
-    private boolean addOffsetCheckMessagesToEmptyQueues() {
+    public boolean addOffsetCheckMessagesToEmptyQueues() {
         if (log.isTraceEnabled()) {
             log.trace("May be add Offset Check Messages to Queues for {} partitions", consumedOffsets.size());
         }
@@ -408,9 +408,9 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
     * It is used later as offset for OffsetCheckMessage. This is only useful until consumedOffset is populated for the partition
     * Once consumedOffset is set, its offset will be used for OffsetCheckMessage
     * */
-    private void initializeEarliestOffsetsIfNeeded(final StampedRecord record) {
-        if (earliestOffsets != null && recordInfo != null && record != null && !earliestOffsets.containsKey(recordInfo.partition())) {
-            earliestOffsets.put(recordInfo.partition(), record.offset());
+    private void saveEarliestOffset(final StampedRecord record, final TopicPartition partition) {
+        if (record != null && !earliestOffsets.containsKey(partition)) {
+            earliestOffsets.put(partition, record.offset());
         }
     }
 
@@ -441,11 +441,11 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         boolean didProcess = false;
 
         try {
-            initializeEarliestOffsetsIfNeeded(record);
             // process the record by passing to the source node of the topology
             final ProcessorNode currNode = recordInfo.node();
             final TopicPartition partition = recordInfo.partition();
 
+            saveEarliestOffset(record, partition);
             if (currNode == null) {
                 log.trace("Skip processing one record [{}]", record);
                 return false;
