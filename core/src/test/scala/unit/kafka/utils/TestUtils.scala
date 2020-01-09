@@ -37,8 +37,8 @@ import kafka.security.auth.{Acl, Authorizer, Resource}
 import kafka.server._
 import kafka.server.checkpoints.OffsetCheckpointFile
 import Implicits._
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.Meter
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Meter
 import kafka.controller.LeaderIsrAndControllerEpoch
 import kafka.zk._
 import org.apache.kafka.clients.CommonClientConfigs
@@ -1600,19 +1600,42 @@ object TestUtils extends Logging {
     total.toLong
   }
 
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
+  }
+
+  private def extractTopic(metricName: String): String = {
+    val pattern = ".*\\.\\{topic=([^}]*)\\}.*".r
+    val pattern(topic) = metricName
+    topic
+  }
+
   def meterCount(metricName: String): Long = {
-    Metrics.defaultRegistry.allMetrics.asScala
-      .filterKeys(_.getMBeanName.endsWith(metricName))
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
+      .filterKeys(extractName(_).equals(metricName))
       .values
       .headOption
       .getOrElse(fail(s"Unable to find metric $metricName"))
       .asInstanceOf[Meter]
-      .count
+      .getCount
   }
 
-  def clearYammerMetrics(): Unit = {
-    for (metricName <- Metrics.defaultRegistry.allMetrics.keySet.asScala)
-      Metrics.defaultRegistry.removeMetric(metricName)
+  def topicMeterCount(metricName: String, topic: String): Long = {
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
+      .filterKeys(extractName(_).equals(metricName))
+      .filterKeys(extractTopic(_).equals(topic))
+      .values
+      .headOption
+      .getOrElse(fail(s"Unable to find metric $metricName for topic $topic"))
+      .asInstanceOf[Meter]
+      .getCount
+  }
+
+  def clearDropwizardMetrics(): Unit = {
+    for (metricName <- SharedMetricRegistries.getOrCreate("default").getNames.asScala)
+      SharedMetricRegistries.getOrCreate("default").remove(metricName)
   }
 
   def stringifyTopicPartitions(partitions: Set[TopicPartition]): String = {

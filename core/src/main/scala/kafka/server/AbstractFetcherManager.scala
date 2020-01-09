@@ -20,7 +20,7 @@ package kafka.server
 import kafka.utils.Logging
 import kafka.cluster.BrokerEndPoint
 import kafka.metrics.KafkaMetricsGroup
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.utils.Utils
 
@@ -41,7 +41,7 @@ abstract class AbstractFetcherManager[T <: AbstractFetcherThread](val name: Stri
     "MaxLag",
     new Gauge[Long] {
       // current max lag across all fetchers/topics/partitions
-      def value: Long = fetcherThreadMap.foldLeft(0L)((curMaxAll, fetcherThreadMapEntry) => {
+      def getValue: Long = fetcherThreadMap.foldLeft(0L)((curMaxAll, fetcherThreadMapEntry) => {
         fetcherThreadMapEntry._2.fetcherLagStats.stats.foldLeft(0L)((curMaxThread, fetcherLagStatsEntry) => {
           curMaxThread.max(fetcherLagStatsEntry._2.lag)
         }).max(curMaxAll)
@@ -54,12 +54,12 @@ abstract class AbstractFetcherManager[T <: AbstractFetcherThread](val name: Stri
   "MinFetchRate", {
     new Gauge[Double] {
       // current min fetch rate across all fetchers/topics/partitions
-      def value: Double = {
+      def getValue: Double = {
         val headRate: Double =
-          fetcherThreadMap.headOption.map(_._2.fetcherStats.requestRate.oneMinuteRate).getOrElse(0)
+          fetcherThreadMap.headOption.map(_._2.fetcherStats.requestRate.getOneMinuteRate).getOrElse(0)
 
         fetcherThreadMap.foldLeft(headRate)((curMinAll, fetcherThreadMapEntry) => {
-          fetcherThreadMapEntry._2.fetcherStats.requestRate.oneMinuteRate.min(curMinAll)
+          fetcherThreadMapEntry._2.fetcherStats.requestRate.getOneMinuteRate.min(curMinAll)
         })
       }
     }
@@ -70,7 +70,7 @@ abstract class AbstractFetcherManager[T <: AbstractFetcherThread](val name: Stri
   val failedPartitionsCount = newGauge(
     "FailedPartitionsCount", {
       new Gauge[Int] {
-        def value: Int = failedPartitions.size
+        def getValue: Int = failedPartitions.size
       }
     },
     Map("clientId" -> clientId)
@@ -78,7 +78,7 @@ abstract class AbstractFetcherManager[T <: AbstractFetcherThread](val name: Stri
 
   newGauge("DeadThreadCount", {
     new Gauge[Int] {
-      def value: Int = {
+      def getValue: Int = {
         deadThreadCount
       }
     }

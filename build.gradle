@@ -678,6 +678,12 @@ project(':core') {
     compile libs.jacksonJDK8Datatypes
     compile libs.joptSimple
     compile libs.metrics
+    compile libs.akkaActor
+    compile libs.akkaStream
+    compile libs.akkaHttp
+    compile libs.prometheus
+    compile libs.prometheusHotspot
+    compile libs.prometheusAkkaHttp
     compile libs.scalaCollectionCompat
     compile libs.scalaJava8Compat
     compile libs.scalaLibrary
@@ -721,7 +727,7 @@ project(':core') {
     scoverage libs.scoveragePlugin
     scoverage libs.scoverageRuntime
   }
-  
+
   scoverage {
     reportDir = file("${rootProject.buildDir}/scoverage")
     highlighting = false

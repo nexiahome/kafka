@@ -23,7 +23,7 @@ import java.nio.file.{Files, Paths}
 import java.util.regex.Pattern
 import java.util.{Collections, Optional, Properties}
 
-import com.yammer.metrics.Metrics
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.api.{ApiVersion, KAFKA_0_11_0_IV0}
 import kafka.common.{OffsetsOutOfOrderException, RecordValidationException, UnexpectedAppendOffsetException}
 import kafka.log.Log.DeleteDirSuffix
@@ -56,7 +56,7 @@ class LogTest {
   val tmpDir = TestUtils.tempDir()
   val logDir = TestUtils.randomPartitionLogDir(tmpDir)
   val mockTime = new MockTime()
-  def metricsKeySet = Metrics.defaultRegistry.allMetrics.keySet.asScala
+  def metricsKeySet = SharedMetricRegistries.getOrCreate("default").getMetrics.keySet.asScala
 
   @Before
   def setUp(): Unit = {
@@ -1919,6 +1919,12 @@ class LogTest {
     }
   }
 
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
+  }
+
   @Test
   def testCompactedTopicConstraints(): Unit = {
     val keyedMessage = new SimpleRecord("and here it is".getBytes, "this message has a key".getBytes)
@@ -1956,7 +1962,7 @@ class LogTest {
     }
 
     // check if metric for NoKeyCompactedTopicRecordsPerSec is logged
-    assertEquals(metricsKeySet.count(_.getMBeanName.endsWith(s"${BrokerTopicStats.NoKeyCompactedTopicRecordsPerSec}")), 1)
+    assertEquals(metricsKeySet.count(extractName(_).endsWith(s"${BrokerTopicStats.NoKeyCompactedTopicRecordsPerSec}")), 1)
     assertTrue(TestUtils.meterCount(s"${BrokerTopicStats.NoKeyCompactedTopicRecordsPerSec}") > 0)
 
     // the following should succeed without any InvalidMessageException

@@ -20,8 +20,8 @@ package kafka.controller
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.{Histogram, MetricName, Timer}
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.{Histogram, Timer}
 import kafka.utils.TestUtils
 import org.apache.kafka.common.utils.MockTime
 import org.junit.Assert.{assertEquals, assertTrue, fail}
@@ -48,9 +48,9 @@ class ControllerEventManagerTest {
       override def preempt(event: ControllerEvent): Unit = {}
     }
 
-    def allEventManagerMetrics: Set[MetricName] = {
-      Metrics.defaultRegistry.allMetrics.asScala.keySet
-        .filter(_.getMBeanName.startsWith("kafka.controller:type=ControllerEventManager"))
+    def allEventManagerMetrics: Set[String] = {
+      SharedMetricRegistries.getOrCreate("default").getNames.asScala
+        .filter(_.startsWith("kafka.controller.{type=ControllerEventManager}"))
         .toSet
     }
 
@@ -65,7 +65,7 @@ class ControllerEventManagerTest {
 
   @Test
   def testEventQueueTime(): Unit = {
-    val metricName = "kafka.controller:type=ControllerEventManager,name=EventQueueTimeMs"
+    val metricName = "kafka.controller.{type=ControllerEventManager}.{name=EventQueueTimeMs}"
     val controllerStats = new ControllerStats
     val time = new MockTime()
     val latch = new CountDownLatch(1)
@@ -81,7 +81,7 @@ class ControllerEventManagerTest {
     }
 
     // The metric should not already exist
-    assertTrue(Metrics.defaultRegistry.allMetrics.asScala.filterKeys(_.getMBeanName == metricName).values.isEmpty)
+    assertTrue(SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.filterKeys(_ == metricName).values.isEmpty)
 
     controllerEventManager = new ControllerEventManager(0, eventProcessor,
       time, controllerStats.rateAndTimeMetrics)
@@ -94,23 +94,23 @@ class ControllerEventManagerTest {
     TestUtils.waitUntilTrue(() => processedEvents.get() == 2,
       "Timed out waiting for processing of all events")
 
-    val queueTimeHistogram = Metrics.defaultRegistry.allMetrics.asScala.filterKeys(_.getMBeanName == metricName).values.headOption
+    val queueTimeHistogram = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.filterKeys(_ == metricName).values.headOption
       .getOrElse(fail(s"Unable to find metric $metricName")).asInstanceOf[Histogram]
 
-    assertEquals(2, queueTimeHistogram.count)
-    assertEquals(0, queueTimeHistogram.min, 0.01)
-    assertEquals(500, queueTimeHistogram.max, 0.01)
+    assertEquals(2, queueTimeHistogram.getCount)
+    assertEquals(0, queueTimeHistogram.getSnapshot.getMin, 0.01)
+    assertEquals(500, queueTimeHistogram.getSnapshot.getMax, 0.01)
   }
 
   @Test
   def testSuccessfulEvent(): Unit = {
-    check("kafka.controller:type=ControllerStats,name=AutoLeaderBalanceRateAndTimeMs",
+    check("kafka.controller.{type=ControllerStats}.{name=AutoLeaderBalanceRateAndTimeMs}",
       AutoPreferredReplicaLeaderElection, () => ())
   }
 
   @Test
   def testEventThatThrowsException(): Unit = {
-    check("kafka.controller:type=ControllerStats,name=LeaderElectionRateAndTimeMs",
+    check("kafka.controller.{type=ControllerStats}.{name=LeaderElectionRateAndTimeMs}",
       BrokerChange, () => throw new NullPointerException)
   }
 
@@ -134,7 +134,7 @@ class ControllerEventManagerTest {
       new MockTime(), controllerStats.rateAndTimeMetrics)
     controllerEventManager.start()
 
-    val initialTimerCount = timer(metricName).count
+    val initialTimerCount = timer(metricName).getCount
 
     controllerEventManager.put(event)
     TestUtils.waitUntilTrue(() => controllerEventManager.state == event.state,
@@ -145,11 +145,11 @@ class ControllerEventManagerTest {
       "Controller state has not changed back to Idle")
     assertEquals(1, eventProcessedListenerCount.get)
 
-    assertEquals("Timer has not been updated", initialTimerCount + 1, timer(metricName).count)
+    assertEquals("Timer has not been updated", initialTimerCount + 1, timer(metricName).getCount)
   }
 
   private def timer(metricName: String): Timer = {
-    Metrics.defaultRegistry.allMetrics.asScala.filterKeys(_.getMBeanName == metricName).values.headOption
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.filterKeys(_ == metricName).values.headOption
       .getOrElse(fail(s"Unable to find metric $metricName")).asInstanceOf[Timer]
   }
 

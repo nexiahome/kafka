@@ -19,8 +19,8 @@ package kafka.log
 
 import java.io.PrintWriter
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.{Gauge, MetricName}
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Gauge
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils.{MockTime, TestUtils}
 import org.apache.kafka.common.TopicPartition
@@ -44,7 +44,7 @@ class LogCleanerIntegrationTest extends AbstractLogCleanerIntegrationTest with K
 
   @After
   def cleanup(): Unit = {
-    TestUtils.clearYammerMetrics()
+    TestUtils.clearDropwizardMetrics()
   }
 
   @Test(timeout = DEFAULT_MAX_WAIT_MS)
@@ -77,10 +77,10 @@ class LogCleanerIntegrationTest extends AbstractLogCleanerIntegrationTest with K
     val uncleanablePartitionsCountGauge = getGauge[Int]("uncleanable-partitions-count", uncleanableDirectory)
     val uncleanableBytesGauge = getGauge[Long]("uncleanable-bytes", uncleanableDirectory)
 
-    TestUtils.waitUntilTrue(() => uncleanablePartitionsCountGauge.value() == 2, "There should be 2 uncleanable partitions", 2000L)
+    TestUtils.waitUntilTrue(() => uncleanablePartitionsCountGauge.getValue() == 2, "There should be 2 uncleanable partitions", 2000L)
     val expectedTotalUncleanableBytes = LogCleanerManager.calculateCleanableBytes(log, 0, log.logSegments.last.baseOffset)._2 +
       LogCleanerManager.calculateCleanableBytes(log2, 0, log2.logSegments.last.baseOffset)._2
-    TestUtils.waitUntilTrue(() => uncleanableBytesGauge.value() == expectedTotalUncleanableBytes,
+    TestUtils.waitUntilTrue(() => uncleanableBytesGauge.getValue() == expectedTotalUncleanableBytes,
       s"There should be $expectedTotalUncleanableBytes uncleanable bytes", 1000L)
 
     val uncleanablePartitions = cleaner.cleanerManager.uncleanablePartitions(uncleanableDirectory)
@@ -89,8 +89,8 @@ class LogCleanerIntegrationTest extends AbstractLogCleanerIntegrationTest with K
     assertFalse(uncleanablePartitions.contains(topicPartitions(2)))
   }
 
-  private def getGauge[T](filter: MetricName => Boolean): Gauge[T] = {
-    Metrics.defaultRegistry.allMetrics.asScala
+  private def getGauge[T](filter: String => Boolean): Gauge[T] = {
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
       .filterKeys(filter(_))
       .headOption
       .getOrElse { fail(s"Unable to find metric") }
@@ -100,11 +100,11 @@ class LogCleanerIntegrationTest extends AbstractLogCleanerIntegrationTest with K
   }
 
   private def getGauge[T](metricName: String): Gauge[T] = {
-    getGauge(mName => mName.getName.endsWith(metricName) && mName.getScope == null)
+    getGauge(mName => mName.contains(s".{name=$metricName}"))
   }
 
   private def getGauge[T](metricName: String, metricScope: String): Gauge[T] = {
-    getGauge(k => k.getName.endsWith(metricName) && k.getScope.endsWith(metricScope))
+    getGauge(k => k.endsWith(".{name=" + metricName + "}.{logDirectory=\"" + metricScope + "\"}"))
   }
 
   @Test
@@ -212,7 +212,7 @@ class LogCleanerIntegrationTest extends AbstractLogCleanerIntegrationTest with K
         thread.isThreadFailed && result
       }), "Threads didn't terminate unexpectedly"
     )
-    assertEquals(cleaner.cleaners.size, getGauge[Int](metricName).value())
+    assertEquals(cleaner.cleaners.size, getGauge[Int](metricName).getValue())
     assertEquals(cleaner.cleaners.size, cleaner.deadThreadCount)
   }
 }

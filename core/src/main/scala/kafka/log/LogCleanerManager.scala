@@ -21,7 +21,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import kafka.common.{KafkaException, LogCleaningAbortedException}
 import kafka.metrics.KafkaMetricsGroup
 import kafka.server.LogDirFailureChannel
@@ -91,7 +91,7 @@ private[log] class LogCleanerManager(val logDirs: Seq[File],
   for (dir <- logDirs) {
     newGauge(
       "uncleanable-partitions-count",
-      new Gauge[Int] { def value = inLock(lock) { uncleanablePartitions.get(dir.getAbsolutePath).map(_.size).getOrElse(0) } },
+      new Gauge[Int] { def getValue = inLock(lock) { uncleanablePartitions.get(dir.getAbsolutePath).map(_.size).getOrElse(0) } },
       Map("logDirectory" -> dir.getAbsolutePath)
     )
   }
@@ -101,7 +101,7 @@ private[log] class LogCleanerManager(val logDirs: Seq[File],
       newGauge(
         "uncleanable-bytes",
         new Gauge[Long] {
-          def value = {
+          def getValue = {
             inLock(lock) {
               uncleanablePartitions.get(dir.getAbsolutePath) match {
                 case Some(partitions) => {
@@ -126,11 +126,11 @@ private[log] class LogCleanerManager(val logDirs: Seq[File],
 
   /* a gauge for tracking the cleanable ratio of the dirtiest log */
   @volatile private var dirtiestLogCleanableRatio = 0.0
-  newGauge("max-dirty-percent", new Gauge[Int] { def value = (100 * dirtiestLogCleanableRatio).toInt })
+  newGauge("max-dirty-percent", new Gauge[Int] { def getValue = (100 * dirtiestLogCleanableRatio).toInt })
 
   /* a gauge for tracking the time since the last log cleaner run, in milli seconds */
   @volatile private var timeOfLastRun : Long = Time.SYSTEM.milliseconds
-  newGauge("time-since-last-run-ms", new Gauge[Long] { def value = Time.SYSTEM.milliseconds - timeOfLastRun })
+  newGauge("time-since-last-run-ms", new Gauge[Long] { def getValue = Time.SYSTEM.milliseconds - timeOfLastRun })
 
   /**
    * @return the position processed for all logs.

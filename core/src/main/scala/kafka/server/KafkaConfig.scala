@@ -210,7 +210,7 @@ object Defaults {
   val MetricRecordingLevel = Sensor.RecordingLevel.INFO.toString()
 
 
-  /** ********* Kafka Yammer Metrics Reporter Configuration ***********/
+  /** ********* Kafka Dropwizard Metrics Reporter Configuration ***********/
   val KafkaMetricReporterClasses = ""
   val KafkaMetricsPollingIntervalSeconds = 10
 
@@ -428,7 +428,7 @@ object KafkaConfig {
   val MetricReporterClassesProp: String = CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG
   val MetricRecordingLevelProp: String = CommonClientConfigs.METRICS_RECORDING_LEVEL_CONFIG
 
-  /** ********* Kafka Yammer Metrics Reporters Configuration ***********/
+  /** ********* Kafka Dropwizard Metrics Reporters Configuration ***********/
   val KafkaMetricsReporterClassesProp = "kafka.metrics.reporters"
   val KafkaMetricsPollingIntervalSecondsProp = "kafka.metrics.polling.interval.secs"
 
@@ -732,7 +732,7 @@ object KafkaConfig {
   val OffsetCommitRequiredAcksDoc = "The required acks before the commit can be accepted. In general, the default (-1) should not be overridden"
   /** ********* Transaction management configuration ***********/
   val TransactionalIdExpirationMsDoc = "The time in ms that the transaction coordinator will wait without receiving any transaction status updates " +
-    "for the current transaction before expiring its transactional id. This setting also influences producer id expiration - producer ids are expired " + 
+    "for the current transaction before expiring its transactional id. This setting also influences producer id expiration - producer ids are expired " +
     "once this time has elapsed after the last write with the given producer id. Note that producer ids may expire sooner if the last write from the producer id is deleted due to the topic's retention settings."
   val TransactionsMaxTimeoutMsDoc = "The maximum allowed timeout for transactions. " +
     "If a client’s requested transaction time exceed this, then the broker will return an error in InitProducerIdRequest. This prevents a client from too large of a timeout, which can stall consumers reading from topics included in the transaction."
@@ -776,8 +776,8 @@ object KafkaConfig {
   val MetricRecordingLevelDoc = CommonClientConfigs.METRICS_RECORDING_LEVEL_DOC
 
 
-  /** ********* Kafka Yammer Metrics Reporter Configuration ***********/
-  val KafkaMetricsReporterClassesDoc = "A list of classes to use as Yammer metrics custom reporters." +
+  /** ********* Kafka Dropwizard Metrics Reporter Configuration ***********/
+  val KafkaMetricsReporterClassesDoc = "A list of classes to use as Dropwizard metrics custom reporters." +
     " The reporters should implement <code>kafka.metrics.KafkaMetricsReporter</code> trait. If a client wants" +
     " to expose JMX operations on a custom reporter, the custom reporter needs to additionally implement an MBean" +
     " trait that extends <code>kafka.metrics.KafkaMetricsReporterMBean</code> trait so that the registered MBean is compliant with" +
@@ -1019,7 +1019,7 @@ object KafkaConfig {
       .define(MetricReporterClassesProp, LIST, Defaults.MetricReporterClasses, LOW, MetricReporterClassesDoc)
       .define(MetricRecordingLevelProp, STRING, Defaults.MetricRecordingLevel, LOW, MetricRecordingLevelDoc)
 
-      /** ********* Kafka Yammer Metrics Reporter Configuration for docs ***********/
+      /** ********* Kafka Dropwizard Metrics Reporter Configuration for docs ***********/
       .define(KafkaMetricsReporterClassesProp, LIST, Defaults.KafkaMetricReporterClasses, LOW, KafkaMetricsReporterClassesDoc)
       .define(KafkaMetricsPollingIntervalSecondsProp, INT, Defaults.KafkaMetricsPollingIntervalSeconds, atLeast(1), LOW, KafkaMetricsPollingIntervalSecondsDoc)
 
