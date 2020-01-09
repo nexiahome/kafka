@@ -28,8 +28,7 @@ import java.util.{Collections, Properties}
 import java.util.concurrent._
 import javax.management.ObjectName
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.MetricName
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.admin.ConfigCommand
 import kafka.api.{KafkaSasl, SaslSetup}
 import kafka.controller.{ControllerBrokerStateInfo, ControllerChannelManager}
@@ -774,14 +773,19 @@ class DynamicBrokerReconfigurationTest extends ZooKeeperTestHarness with SaslSet
     verifyMarkPartitionsForTruncation()
   }
 
-  private def isProcessorMetric(metricName: MetricName): Boolean = {
-    val mbeanName = metricName.getMBeanName
-    mbeanName.contains(s"${Processor.NetworkProcessorMetricTag}=") || mbeanName.contains(s"${RequestChannel.ProcessorMetricTag}=")
+  private def isProcessorMetric(metricName: String): Boolean = {
+    metricName.contains(s".{${Processor.NetworkProcessorMetricTag}=") || metricName.contains(s".{${RequestChannel.ProcessorMetricTag}=")
   }
 
   private def clearLeftOverProcessorMetrics(): Unit = {
-    val metricsFromOldTests = Metrics.defaultRegistry.allMetrics.keySet.asScala.filter(isProcessorMetric)
-    metricsFromOldTests.foreach(Metrics.defaultRegistry.removeMetric)
+    val metricsFromOldTests = SharedMetricRegistries.getOrCreate("default").getNames.asScala.filter(isProcessorMetric)
+    metricsFromOldTests.foreach(SharedMetricRegistries.getOrCreate("default").remove)
+  }
+
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
   }
 
   // Verify that metrics from processors that were removed have been deleted.
@@ -795,9 +799,9 @@ class DynamicBrokerReconfigurationTest extends ZooKeeperTestHarness with SaslSet
       .groupBy(_.tags.get(Processor.NetworkProcessorMetricTag))
     assertEquals(numProcessors, kafkaMetrics.size)
 
-    Metrics.defaultRegistry.allMetrics.keySet.asScala
+    SharedMetricRegistries.getOrCreate("default").getNames.asScala
       .filter(isProcessorMetric)
-      .groupBy(_.getName)
+      .groupBy(extractName(_))
       .foreach { case (name, set) => assertEquals(s"Metrics not deleted $name", numProcessors, set.size) }
   }
 
@@ -840,11 +844,6 @@ class DynamicBrokerReconfigurationTest extends ZooKeeperTestHarness with SaslSet
     val clientId = "test-client-1"
     val (producerThread, consumerThread) = startProduceConsume(retries = 0, clientId)
     TestUtils.waitUntilTrue(() => consumerThread.received >= 5, "Messages not sent")
-
-    // Verify that JMX reporter is still active (test a metric registered after the dynamic reporter update)
-    val mbeanServer = ManagementFactory.getPlatformMBeanServer
-    val byteRate = mbeanServer.getAttribute(new ObjectName(s"kafka.server:type=Produce,client-id=$clientId"), "byte-rate")
-    assertTrue("JMX attribute not updated", byteRate.asInstanceOf[Double] > 0)
 
     // Property not related to the metrics reporter config should not reconfigure reporter
     newProps.setProperty("some.prop", "some.value")

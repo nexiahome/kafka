@@ -20,8 +20,8 @@ package kafka.metrics
 import java.util.Properties
 
 import javax.management.ObjectName
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.MetricPredicate
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Meter
 import org.junit.Test
 import org.junit.Assert._
 import kafka.integration.KafkaServerTestHarness
@@ -51,7 +51,7 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     createTopic(topic, 1, 1)
     adminZkClient.deleteTopic(topic)
     TestUtils.verifyTopicDeletion(zkClient, topic, 1, servers)
-    assertEquals("Topic metrics exists after deleteTopic", Set.empty, topicMetricGroups(topic))
+    assertEquals("Topic metrics exists after deleteTopic", Set.empty, topicMetrics(Some(topic)))
   }
 
   @Test
@@ -61,18 +61,18 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     // Produce a few messages to create the metrics
     // Don't consume messages as it may cause metrics to be re-created causing the test to fail, see KAFKA-5238
     TestUtils.generateAndProduceMessages(servers, topic, nMessages)
-    assertTrue("Topic metrics don't exist", topicMetricGroups(topic).nonEmpty)
+    assertTrue("Topic metrics don't exist", topicMetrics(Some(topic)).nonEmpty)
     servers.foreach(s => assertNotNull(s.brokerTopicStats.topicStats(topic)))
     adminZkClient.deleteTopic(topic)
     TestUtils.verifyTopicDeletion(zkClient, topic, 1, servers)
-    assertEquals("Topic metrics exists after deleteTopic", Set.empty, topicMetricGroups(topic))
+    assertEquals("Topic metrics exists after deleteTopic", Set.empty, topicMetrics(Some(topic)))
   }
 
   @Test
   def testClusterIdMetric(): Unit = {
     // Check if clusterId metric exists.
-    val metrics = Metrics.defaultRegistry.allMetrics
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.server:type=KafkaServer,name=ClusterId"), 1)
+    val metrics = SharedMetricRegistries.getOrCreate("default").getMetrics
+    assertEquals(metrics.keySet.asScala.count(_ == "kafka.server.{type=KafkaServer}.{name=ClusterId}"), 1)
   }
 
   @Test
@@ -84,18 +84,18 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     assertTrue("General topic metrics don't exist", topicMetrics(None).nonEmpty)
     assertEquals(servers.head.brokerTopicStats.allTopicsStats.metricMap.size, topicMetrics(None).size)
     // topic metrics should be lazily registered
-    assertTrue("Topic metrics aren't lazily registered", topicMetricGroups(topic).isEmpty)
+    assertTrue("Topic metrics aren't lazily registered", topicMetrics(Some(topic)).isEmpty)
     TestUtils.generateAndProduceMessages(servers, topic, nMessages)
-    assertTrue("Topic metrics aren't registered", topicMetricGroups(topic).nonEmpty)
+    assertTrue("Topic metrics aren't registered", topicMetrics(Some(topic)).nonEmpty)
   }
 
   @Test
   def testWindowsStyleTagNames(): Unit = {
     val path = "C:\\windows-path\\kafka-logs"
     val tags = Map("dir" -> path)
-    val expectedMBeanName = Set(tags.keySet.head, ObjectName.quote(path)).mkString("=")
-    val metric = KafkaMetricsGroup.metricName("test-metric", tags)
-    assert(metric.getMBeanName.endsWith(expectedMBeanName))
+    val expectedTag = Set(tags.keySet.head, ObjectName.quote(path)).mkString("=")
+    val metricname = KafkaMetricsGroup.metricName("test-metric", tags)
+    assert(metricname.endsWith(".{" + expectedTag + "}"))
   }
 
   @Test
@@ -103,8 +103,8 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     val topic = "test-bytes-in-out"
     val replicationBytesIn = BrokerTopicStats.ReplicationBytesInPerSec
     val replicationBytesOut = BrokerTopicStats.ReplicationBytesOutPerSec
-    val bytesIn = s"${BrokerTopicStats.BytesInPerSec},topic=$topic"
-    val bytesOut = s"${BrokerTopicStats.BytesOutPerSec},topic=$topic"
+    val bytesIn = s"${BrokerTopicStats.BytesInPerSec}"
+    val bytesOut = s"${BrokerTopicStats.BytesOutPerSec}"
 
     val topicConfig = new Properties
     topicConfig.setProperty(LogConfig.MinInSyncReplicasProp, "2")
@@ -127,8 +127,8 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
     TestUtils.consumeTopicRecords(servers, topic, nMessages)
     val initialReplicationBytesIn = TestUtils.meterCount(replicationBytesIn)
     val initialReplicationBytesOut = TestUtils.meterCount(replicationBytesOut)
-    val initialBytesIn = TestUtils.meterCount(bytesIn)
-    val initialBytesOut = TestUtils.meterCount(bytesOut)
+    val initialBytesIn = TestUtils.topicMeterCount(bytesIn, topic)
+    val initialBytesOut = TestUtils.topicMeterCount(bytesOut, topic)
 
     // BytesOut doesn't include replication, so it shouldn't have changed
     assertEquals(initialBytesOut, TestUtils.meterCount(bytesOut))
@@ -138,27 +138,27 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
 
     assertTrue(TestUtils.meterCount(replicationBytesIn) > initialReplicationBytesIn)
     assertTrue(TestUtils.meterCount(replicationBytesOut) > initialReplicationBytesOut)
-    assertTrue(TestUtils.meterCount(bytesIn) > initialBytesIn)
+    assertTrue(TestUtils.topicMeterCount(bytesIn, topic) > initialBytesIn)
 
     // Consume messages to make bytesOut tick
     TestUtils.consumeTopicRecords(servers, topic, nMessages)
 
-    assertTrue(TestUtils.meterCount(bytesOut) > initialBytesOut)
+    assertTrue(TestUtils.topicMeterCount(bytesOut, topic) > initialBytesOut)
   }
 
   @Test
   def testControllerMetrics(): Unit = {
-    val metrics = Metrics.defaultRegistry.allMetrics
+    val metricNames = SharedMetricRegistries.getOrCreate("default").getNames
 
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=ActiveControllerCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=OfflinePartitionsCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=PreferredReplicaImbalanceCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=GlobalTopicCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=GlobalPartitionCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=TopicsToDeleteCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=ReplicasToDeleteCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=TopicsIneligibleToDeleteCount"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.controller:type=KafkaController,name=ReplicasIneligibleToDeleteCount"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=ActiveControllerCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=OfflinePartitionsCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=PreferredReplicaImbalanceCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=GlobalTopicCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=GlobalPartitionCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=TopicsToDeleteCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=ReplicasToDeleteCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=TopicsIneligibleToDeleteCount}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.controller.{type=KafkaController}.{name=ReplicasIneligibleToDeleteCount}"), 1)
   }
 
   /**
@@ -167,25 +167,20 @@ class MetricsTest extends KafkaServerTestHarness with Logging {
    */
   @Test
   def testSessionExpireListenerMetrics(): Unit = {
-    val metrics = Metrics.defaultRegistry.allMetrics
+    val metricNames = SharedMetricRegistries.getOrCreate("default").getNames
 
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.server:type=SessionExpireListener,name=SessionState"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.server:type=SessionExpireListener,name=ZooKeeperExpiresPerSec"), 1)
-    assertEquals(metrics.keySet.asScala.count(_.getMBeanName == "kafka.server:type=SessionExpireListener,name=ZooKeeperDisconnectsPerSec"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.server.{type=SessionExpireListener}.{name=SessionState}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.server.{type=SessionExpireListener}.{name=ZooKeeperExpiresPerSec}"), 1)
+    assertEquals(metricNames.asScala.count(_ == "kafka.server.{type=SessionExpireListener}.{name=ZooKeeperDisconnectsPerSec}"), 1)
   }
 
   private def topicMetrics(topic: Option[String]): Set[String] = {
-    val metricNames = Metrics.defaultRegistry.allMetrics().keySet.asScala.map(_.getMBeanName)
+    val metricNames = SharedMetricRegistries.getOrCreate("default").getNames.asScala
     filterByTopicMetricRegex(metricNames, topic)
   }
 
-  private def topicMetricGroups(topic: String): Set[String] = {
-    val metricGroups = Metrics.defaultRegistry.groupedMetrics(MetricPredicate.ALL).keySet.asScala
-    filterByTopicMetricRegex(metricGroups, Some(topic))
-  }
-
   private def filterByTopicMetricRegex(metrics: Set[String], topic: Option[String]): Set[String] = {
-    val pattern = (".*BrokerTopicMetrics.*" + topic.map(t => s"($t)$$").getOrElse("")).r.pattern
+    val pattern = (".*BrokerTopicMetrics.*" + topic.map(t => s"\\.\\{topic=${t}\\}").getOrElse("")).r.pattern
     metrics.filter(pattern.matcher(_).matches())
   }
 }

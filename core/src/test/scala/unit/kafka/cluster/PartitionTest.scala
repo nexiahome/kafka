@@ -22,8 +22,8 @@ import java.util.{Optional, Properties}
 import java.util.concurrent.{CountDownLatch, Executors, TimeUnit, TimeoutException}
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.Metric
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Metric
 import kafka.api.{ApiVersion, LeaderAndIsr}
 import kafka.common.UnexpectedAppendOffsetException
 import kafka.log.{Defaults => _, _}
@@ -67,7 +67,7 @@ class PartitionTest {
 
   @Before
   def setup(): Unit = {
-    TestUtils.clearYammerMetrics()
+    TestUtils.clearDropwizardMetrics()
 
     val logProps = createLogProperties(Map.empty)
     logConfig = LogConfig(logProps)
@@ -107,7 +107,7 @@ class PartitionTest {
   def tearDown(): Unit = {
     logManager.shutdown()
     Utils.delete(tmpDir)
-    TestUtils.clearYammerMetrics()
+    TestUtils.clearDropwizardMetrics()
   }
 
   @Test
@@ -1537,6 +1537,18 @@ class PartitionTest {
     assertEquals(4, partition.localLogOrException.highWatermark)
   }
 
+  private def extractType(metricName: String): String = {
+    val pattern = ".*\\.\\{type=([^}]*)\\}.*".r
+    val pattern(aType) = metricName
+    aType
+  }
+
+  private def extractName(metricName: String): String = {
+    val pattern = ".*\\.\\{name=([^}]*)\\}.*".r
+    val pattern(name) = metricName
+    name
+  }
+
   @Test
   def testAddAndRemoveMetrics(): Unit = {
     val metricsToCheck = List(
@@ -1548,8 +1560,8 @@ class PartitionTest {
       "AtMinIsr")
 
     def getMetric(metric: String): Option[Metric] = {
-      Metrics.defaultRegistry().allMetrics().asScala.filterKeys { metricName =>
-        metricName.getName == metric && metricName.getType == "Partition"
+      SharedMetricRegistries.getOrCreate("default").getMetrics().asScala.filterKeys { metricName =>
+        extractName(metricName) == metric && extractType(metricName) == "Partition"
       }.headOption.map(_._2)
     }
 
@@ -1557,7 +1569,7 @@ class PartitionTest {
 
     Partition.removeMetrics(topicPartition)
 
-    assertEquals(Set(), Metrics.defaultRegistry().allMetrics().asScala.keySet.filter(_.getType == "Partition"))
+    assertEquals(Set(), SharedMetricRegistries.getOrCreate("default").getMetrics().asScala.keySet.filter(extractType(_) == "Partition"))
   }
 
   /**

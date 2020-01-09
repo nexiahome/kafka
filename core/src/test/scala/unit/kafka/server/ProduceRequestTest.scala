@@ -20,7 +20,7 @@ package kafka.server
 import java.nio.ByteBuffer
 import java.util.Properties
 
-import com.yammer.metrics.Metrics
+import com.codahale.metrics.SharedMetricRegistries
 import kafka.log.LogConfig
 import kafka.message.ZStdCompressionCodec
 import kafka.utils.TestUtils
@@ -40,7 +40,7 @@ import scala.collection.JavaConverters._
   */
 class ProduceRequestTest extends BaseRequestTest {
 
-  val metricsKeySet = Metrics.defaultRegistry.allMetrics.keySet.asScala
+  val metricsKeySet = SharedMetricRegistries.getOrCreate("default").getMetrics.keySet.asScala
 
   @Test
   def testSimpleProduceRequest(): Unit = {
@@ -144,7 +144,7 @@ class ProduceRequestTest extends BaseRequestTest {
     memoryRecords.buffer.array.update(DefaultRecordBatch.RECORD_BATCH_OVERHEAD + lz4ChecksumOffset, 0)
     val topicPartition = new TopicPartition("topic", partition)
     val partitionRecords = Map(topicPartition -> memoryRecords)
-    val produceResponse = sendProduceRequest(leader, 
+    val produceResponse = sendProduceRequest(leader,
       ProduceRequest.Builder.forCurrentMagic(-1, 3000, partitionRecords.asJava).build())
     assertEquals(1, produceResponse.responses.size)
     val (tp, partitionResponse) = produceResponse.responses.asScala.head
@@ -152,7 +152,7 @@ class ProduceRequestTest extends BaseRequestTest {
     assertEquals(Errors.CORRUPT_MESSAGE, partitionResponse.error)
     assertEquals(-1, partitionResponse.baseOffset)
     assertEquals(-1, partitionResponse.logAppendTime)
-    assertEquals(metricsKeySet.count(_.getMBeanName.endsWith(s"${BrokerTopicStats.InvalidMessageCrcRecordsPerSec}")), 1)
+    assertEquals(metricsKeySet.count(_.contains(s".{name=${BrokerTopicStats.InvalidMessageCrcRecordsPerSec}}")), 1)
     assertTrue(TestUtils.meterCount(s"${BrokerTopicStats.InvalidMessageCrcRecordsPerSec}") > 0)
   }
 
