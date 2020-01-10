@@ -533,12 +533,20 @@ class GroupMetadataManager(brokerId: Int,
 
   private[group] def loadGroupsAndOffsets(topicPartition: TopicPartition, onGroupLoaded: GroupMetadata => Unit): Unit = {
     try {
+      val tags: Map[String, String] = Map("topic" -> Topic.GROUP_METADATA_TOPIC_NAME, "partition" -> topicPartition.partition.toString)
+      removeMetric("LoadGroupsAndOffsetsDurationMs", tags)
       val startMs = time.milliseconds()
       doLoadGroupsAndOffsets(topicPartition, onGroupLoaded)
       val endMs = time.milliseconds()
       val timeLapse = endMs - startMs
       partitionLoadSensor.record(timeLapse, endMs, false)
-      info(s"Finished loading offsets and group metadata from $topicPartition in $timeLapse milliseconds.")
+      val durationMs = time.milliseconds() - startMs
+      info(s"Finished loading offsets and group metadata from $topicPartition in $durationMs milliseconds.")
+      newGauge("LoadGroupsAndOffsetsDurationMs",
+        new Gauge[Long] {
+          def getValue() = durationMs
+        },
+        tags)
     } catch {
       case t: Throwable => error(s"Error loading offsets from $topicPartition", t)
     } finally {
@@ -755,6 +763,8 @@ class GroupMetadataManager(brokerId: Int,
         }
       }
 
+      val tags: Map[String, String] = Map("topic" -> Topic.GROUP_METADATA_TOPIC_NAME, "partition" -> offsetsPartition.toString)
+      removeMetric("LoadGroupsAndOffsetsDurationMs", tags)
       info(s"Finished unloading $topicPartition. Removed $numOffsetsRemoved cached offsets " +
         s"and $numGroupsRemoved cached groups.")
     }
