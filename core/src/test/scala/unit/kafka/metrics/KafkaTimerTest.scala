@@ -20,35 +20,36 @@ package kafka.metrics
 import org.junit.Test
 import java.util.concurrent.TimeUnit
 import org.junit.Assert._
-import com.yammer.metrics.core.{MetricsRegistry, Clock}
+import com.codahale.metrics.{MetricRegistry, Clock, SlidingWindowReservoir, Timer}
 
 class KafkaTimerTest {
 
   @Test
   def testKafkaTimer(): Unit = {
     val clock = new ManualClock
-    val testRegistry = new MetricsRegistry(clock)
-    val metric = testRegistry.newTimer(this.getClass, "TestTimer")
+    var manualTimer = new Timer(new SlidingWindowReservoir(1000), clock)
+    val testRegistry = new MetricRegistry()
+    val metric = testRegistry.register(MetricRegistry.name(this.getClass, "TestTimer"), manualTimer)
     val Epsilon = java.lang.Double.longBitsToDouble(0x3ca0000000000000L)
 
     val timer = new KafkaTimer(metric)
     timer.time {
       clock.addMillis(1000)
     }
-    assertEquals(1, metric.count())
-    assertTrue((metric.max() - 1000).abs <= Epsilon)
-    assertTrue((metric.min() - 1000).abs <= Epsilon)
+    assertEquals(1, metric.getCount())
+    assertTrue((metric.getSnapshot.getMax - 1000000000).abs <= Epsilon)
+    assertTrue((metric.getSnapshot.getMin - 1000000000).abs <= Epsilon)
   }
 
   private class ManualClock extends Clock {
 
     private var ticksInNanos = 0L
 
-    override def tick() = {
+    override def getTick() = {
       ticksInNanos
     }
 
-    override def time() = {
+    override def getTime() = {
       TimeUnit.NANOSECONDS.toMillis(ticksInNanos)
     }
 

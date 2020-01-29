@@ -22,7 +22,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent._
 
 import com.typesafe.scalalogging.Logger
-import com.yammer.metrics.core.{Gauge, Meter}
+import com.codahale.metrics.{Gauge, Meter}
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils.{Logging, NotNothing, Pool}
 import org.apache.kafka.common.memory.MemoryPool
@@ -281,11 +281,11 @@ class RequestChannel(val queueSize: Int, val metricNamePrefix : String) extends 
   val responseQueueSizeMetricName = metricNamePrefix.concat(ResponseQueueSizeMetric)
 
   newGauge(requestQueueSizeMetricName, new Gauge[Int] {
-      def value = requestQueue.size
+      def getValue = requestQueue.size
   })
 
   newGauge(responseQueueSizeMetricName, new Gauge[Int]{
-    def value = processors.values.asScala.foldLeft(0) {(total, processor) =>
+    def getValue = processors.values.asScala.foldLeft(0) {(total, processor) =>
       total + processor.responseQueueSize
     }
   })
@@ -296,7 +296,7 @@ class RequestChannel(val queueSize: Int, val metricNamePrefix : String) extends 
 
     newGauge(responseQueueSizeMetricName,
       new Gauge[Int] {
-        def value = processor.responseQueueSize
+        def getValue = processor.responseQueueSize
       },
       Map(ProcessorMetricTag -> processor.id.toString)
     )

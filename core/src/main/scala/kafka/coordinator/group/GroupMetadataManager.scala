@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import kafka.api.{ApiVersion, KAFKA_0_10_1_IV0, KAFKA_2_1_IV0, KAFKA_2_1_IV1, KAFKA_2_3_IV0}
 import kafka.common.{MessageFormatter, OffsetAndMetadata}
 import kafka.metrics.KafkaMetricsGroup
@@ -125,47 +125,47 @@ class GroupMetadataManager(brokerId: Int,
 
   recreateGauge("NumOffsets",
     new Gauge[Int] {
-      def value = groupMetadataCache.values.map(group => {
+      def getValue = groupMetadataCache.values.map(group => {
         group.inLock { group.numOffsets }
       }).sum
     })
 
   recreateGauge("NumGroups",
     new Gauge[Int] {
-      def value = groupMetadataCache.size
+      def getValue = groupMetadataCache.size
     })
 
   recreateGauge("NumGroupsPreparingRebalance",
     new Gauge[Int] {
-      def value(): Int = groupMetadataCache.values.count(group => {
+      def getValue(): Int = groupMetadataCache.values.count(group => {
         group synchronized { group.is(PreparingRebalance) }
       })
     })
 
   recreateGauge("NumGroupsCompletingRebalance",
     new Gauge[Int] {
-      def value(): Int = groupMetadataCache.values.count(group => {
+      def getValue(): Int = groupMetadataCache.values.count(group => {
         group synchronized { group.is(CompletingRebalance) }
       })
     })
 
   recreateGauge("NumGroupsStable",
     new Gauge[Int] {
-      def value(): Int = groupMetadataCache.values.count(group => {
+      def getValue(): Int = groupMetadataCache.values.count(group => {
         group synchronized { group.is(Stable) }
       })
     })
 
   recreateGauge("NumGroupsDead",
     new Gauge[Int] {
-      def value(): Int = groupMetadataCache.values.count(group => {
+      def getValue(): Int = groupMetadataCache.values.count(group => {
         group synchronized { group.is(Dead) }
       })
     })
 
   recreateGauge("NumGroupsEmpty",
     new Gauge[Int] {
-      def value(): Int = groupMetadataCache.values.count(group => {
+      def getValue(): Int = groupMetadataCache.values.count(group => {
         group synchronized { group.is(Empty) }
       })
     })
@@ -533,12 +533,20 @@ class GroupMetadataManager(brokerId: Int,
 
   private[group] def loadGroupsAndOffsets(topicPartition: TopicPartition, onGroupLoaded: GroupMetadata => Unit): Unit = {
     try {
+      val tags: Map[String, String] = Map("topic" -> Topic.GROUP_METADATA_TOPIC_NAME, "partition" -> topicPartition.partition.toString)
+      removeMetric("LoadGroupsAndOffsetsDurationMs", tags)
       val startMs = time.milliseconds()
       doLoadGroupsAndOffsets(topicPartition, onGroupLoaded)
       val endMs = time.milliseconds()
       val timeLapse = endMs - startMs
       partitionLoadSensor.record(timeLapse, endMs, false)
-      info(s"Finished loading offsets and group metadata from $topicPartition in $timeLapse milliseconds.")
+      val durationMs = time.milliseconds() - startMs
+      info(s"Finished loading offsets and group metadata from $topicPartition in $durationMs milliseconds.")
+      newGauge("LoadGroupsAndOffsetsDurationMs",
+        new Gauge[Long] {
+          def getValue() = durationMs
+        },
+        tags)
     } catch {
       case t: Throwable => error(s"Error loading offsets from $topicPartition", t)
     } finally {
@@ -755,6 +763,8 @@ class GroupMetadataManager(brokerId: Int,
         }
       }
 
+      val tags: Map[String, String] = Map("topic" -> Topic.GROUP_METADATA_TOPIC_NAME, "partition" -> offsetsPartition.toString)
+      removeMetric("LoadGroupsAndOffsetsDurationMs", tags)
       info(s"Finished unloading $topicPartition. Removed $numOffsetsRemoved cached offsets " +
         s"and $numGroupsRemoved cached groups.")
     }
