@@ -196,8 +196,13 @@ class AssignedStreamsTasks extends AssignedTasks<StreamTask> implements Restorin
         while (it.hasNext()) {
             final StreamTask task = it.next().getValue();
             try {
-                if (task.isProcessable(now) && task.process()) {
-                    processed++;
+                if (task.isProcessable(now)) {
+                    if (task.process())
+                        processed++;
+                } else if (task.shouldCheckOffset(now)) {
+                    if (task.checkOffset()) {
+                        processed++;
+                    }
                 }
             } catch (final TaskMigratedException e) {
                 log.info("Failed to process stream task {} since it got migrated to another thread already. " +

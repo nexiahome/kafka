@@ -31,6 +31,7 @@ import org.apache.kafka.streams.internals.ApiUtils;
 import org.apache.kafka.streams.internals.QuietStreamsConfig;
 import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.kstream.ValueTransformer;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.internals.RecordCollector;
 import org.apache.kafka.streams.processor.internals.metrics.StreamsMetricsImpl;
 import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
@@ -184,6 +185,14 @@ public class MockProcessorContext implements ProcessorContext, RecordCollector.S
             },
             new TaskId(0, 0),
             null);
+    }
+
+    public Object clone() {
+        try {
+            return super.clone();
+        } catch (final CloneNotSupportedException e) {
+            throw new AssertionError("Can't clone " + this);
+        }
     }
 
     /**
@@ -424,24 +433,25 @@ public class MockProcessorContext implements ProcessorContext, RecordCollector.S
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key, final V value) {
-        forward(key, value, To.all());
+    public <K, V> AsyncProcessingResult forward(final K key, final V value) {
+        return forward(key, value, To.all());
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key, final V value, final To to) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final To to) {
         capturedForwards.add(
             new CapturedForward(
                 to.timestamp == -1 ? to.withTimestamp(timestamp == null ? -1 : timestamp) : to,
                 new KeyValue(key, value)
             )
         );
+        return new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
     }
 
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final int childIndex) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final int childIndex) {
         throw new UnsupportedOperationException(
             "Forwarding to a child by index is deprecated. " +
                 "Please transition processors to forward using a 'To' object instead."
@@ -450,7 +460,7 @@ public class MockProcessorContext implements ProcessorContext, RecordCollector.S
 
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final String childName) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final String childName) {
         throw new UnsupportedOperationException(
             "Forwarding to a child by name is deprecated. " +
                 "Please transition processors to forward using 'To.child(childName)' instead."

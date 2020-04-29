@@ -138,6 +138,7 @@ public class StreamsConfig extends AbstractConfig {
     private final boolean eosEnabled;
     private final static long DEFAULT_COMMIT_INTERVAL_MS = 30000L;
     private final static long EOS_DEFAULT_COMMIT_INTERVAL_MS = 100L;
+    private final static long DEFAULT_MAX_TASK_OFFSET_CHECK_IDLE_MS_DOC = 1000L;
 
     public final static int DUMMY_THREAD_INDEX = 1;
 
@@ -304,6 +305,11 @@ public class StreamsConfig extends AbstractConfig {
     public static final String MAX_TASK_IDLE_MS_CONFIG = "max.task.idle.ms";
     private static final String MAX_TASK_IDLE_MS_DOC = "Maximum amount of time a stream task will stay idle when not all of its partition buffers contain records," +
         " to avoid potential out-of-order record processing across multiple input streams.";
+
+    /** {@code max.task.idle.ms} */
+    public static final String MAX_TASK_OFFSET_CHECK_IDLE_MS_CONFIG = "max.task.offset.check.idle.ms";
+    private static final String MAX_TASK_OFFSET_CHECK_IDLE_MS_DOC = "Maximum amount of time a stream task will stay idle before checking offsets when all its partition buffers are empty" +
+            " to update process message offset for asynchronous process after end of stream.";
 
     /** {@code connections.max.idle.ms} */
     @SuppressWarnings("WeakerAccess")
@@ -551,6 +557,11 @@ public class StreamsConfig extends AbstractConfig {
                     0L,
                     Importance.MEDIUM,
                     MAX_TASK_IDLE_MS_DOC)
+            .define(MAX_TASK_OFFSET_CHECK_IDLE_MS_CONFIG,
+                    Type.LONG,
+                    DEFAULT_MAX_TASK_OFFSET_CHECK_IDLE_MS_DOC,
+                    Importance.MEDIUM,
+                    MAX_TASK_OFFSET_CHECK_IDLE_MS_DOC)
             .define(PROCESSING_GUARANTEE_CONFIG,
                     Type.STRING,
                     AT_LEAST_ONCE,

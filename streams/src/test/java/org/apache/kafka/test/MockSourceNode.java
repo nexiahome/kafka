@@ -17,13 +17,15 @@
 package org.apache.kafka.test;
 
 
-import org.apache.kafka.common.serialization.Deserializer;
-import org.apache.kafka.streams.processor.internals.InternalProcessorContext;
-import org.apache.kafka.streams.processor.internals.SourceNode;
+import static org.apache.kafka.streams.processor.AsyncProcessingResult.Status.OFFSET_UPDATED;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.internals.InternalProcessorContext;
+import org.apache.kafka.streams.processor.internals.SourceNode;
 
 public class MockSourceNode<K, V> extends SourceNode<K, V> {
 
@@ -33,8 +35,12 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     public int numReceived = 0;
     public final ArrayList<K> keys = new ArrayList<>();
     public final ArrayList<V> values = new ArrayList<>();
+    public final ArrayList<Long> offsets = new ArrayList<>();
     public boolean initialized;
     public boolean closed;
+    public boolean processedSynchronously = true;
+    public boolean shouldOverrideProcessAsync = false;
+    public AsyncProcessingResult overrideAsyncResult;
 
     public MockSourceNode(final String[] topics, final Deserializer<K> keyDeserializer, final Deserializer<V> valDeserializer) {
         super(NAME + INDEX.getAndIncrement(), Arrays.asList(topics), keyDeserializer, valDeserializer);
@@ -48,6 +54,20 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     }
 
     @Override
+    public AsyncProcessingResult maybeProcessAsync(final K key, final V value, final long offset) {
+        AsyncProcessingResult result = shouldOverrideProcessAsync ? overrideAsyncResult :
+            new AsyncProcessingResult(OFFSET_UPDATED, offset);
+
+        if (result.getStatus() == OFFSET_UPDATED) {
+            process(key, value);
+            this.offsets.add(result.getLastProcessedOffset());
+            this.processedSynchronously = false;
+        }
+
+        return result;
+    }
+
+    @Override
     public void init(final InternalProcessorContext context) {
         super.init(context);
         initialized = true;
@@ -57,5 +77,19 @@ public class MockSourceNode<K, V> extends SourceNode<K, V> {
     public void close() {
         super.close();
         this.closed = true;
+    }
+
+    public void overrideAsyncAndReturnOffset(long offset) {
+        shouldOverrideProcessAsync = true;
+        overrideAsyncResult = new AsyncProcessingResult(OFFSET_UPDATED, offset);
+    }
+
+    public void resetAsyncOverride() {
+        shouldOverrideProcessAsync = false;
+    }
+
+    public void overrideAsyncResult(AsyncProcessingResult asyncProcessingResult) {
+        shouldOverrideProcessAsync = true;
+        overrideAsyncResult = asyncProcessingResult;
     }
 }

@@ -53,6 +53,8 @@ class RecordDeserializer {
                                                final ConsumerRecord<byte[], byte[]> rawRecord) {
 
         try {
+            // flag used to skip deserialization of OffsetCheckRecord which contains null key and null value.
+            final boolean isOffsetCheckRecord = rawRecord.headers().lastHeader(ProcessorContext.OFFSET_CHECK_RECORD_HEADER) != null;
             return new ConsumerRecord<>(
                 rawRecord.topic(),
                 rawRecord.partition(),
@@ -62,8 +64,8 @@ class RecordDeserializer {
                 rawRecord.checksum(),
                 rawRecord.serializedKeySize(),
                 rawRecord.serializedValueSize(),
-                sourceNode.deserializeKey(rawRecord.topic(), rawRecord.headers(), rawRecord.key()),
-                sourceNode.deserializeValue(rawRecord.topic(), rawRecord.headers(), rawRecord.value()), rawRecord.headers());
+                isOffsetCheckRecord ? null : sourceNode.deserializeKey(rawRecord.topic(), rawRecord.headers(), rawRecord.key()),
+                isOffsetCheckRecord ? null : sourceNode.deserializeValue(rawRecord.topic(), rawRecord.headers(), rawRecord.value()), rawRecord.headers());
         } catch (final Exception deserializationException) {
             final DeserializationExceptionHandler.DeserializationHandlerResponse response;
             try {

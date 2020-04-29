@@ -19,6 +19,7 @@ package org.apache.kafka.streams.processor.internals;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.streams.kstream.internals.ChangedDeserializer;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.TimestampExtractor;
 
@@ -86,6 +87,13 @@ public class SourceNode<K, V> extends ProcessorNode<K, V> {
     public void process(final K key, final V value) {
         context.forward(key, value);
         sourceNodeForwardSensor().record();
+    }
+
+    @Override
+    public AsyncProcessingResult maybeProcessAsync(final K key, final V value, final long offset) {
+        final AsyncProcessingResult processingResult = context.forward(key, value);
+        sourceNodeForwardSensor().record();
+        return processingResult;
     }
 
     /**

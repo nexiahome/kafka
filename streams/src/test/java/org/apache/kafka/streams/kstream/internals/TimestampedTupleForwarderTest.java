@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.streams.kstream.internals;
 
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.To;
@@ -61,11 +63,19 @@ public class TimestampedTupleForwarderTest {
 
         expect(store.setFlushListener(null, sendOldValues)).andReturn(false);
         if (sendOldValues) {
-            context.forward("key1", new Change<>("newValue1",  "oldValue1"));
-            context.forward("key2", new Change<>("newValue2",  "oldValue2"), To.all().withTimestamp(42L));
+            expect(context.forward("key1", new Change<>("newValue1", "oldValue1")))
+                .andReturn(new AsyncProcessingResult(
+                    Status.OFFSET_UPDATED, 1L));
+            expect(context.forward("key2", new Change<>("newValue2", "oldValue2"),
+                To.all().withTimestamp(42L))).andReturn(new AsyncProcessingResult(
+                Status.OFFSET_UPDATED, 2L));
         } else {
-            context.forward("key1", new Change<>("newValue1", null));
-            context.forward("key2", new Change<>("newValue2", null), To.all().withTimestamp(42L));
+            expect(context.forward("key1", new Change<>("newValue1", null)))
+                .andReturn(new AsyncProcessingResult(
+                    Status.OFFSET_UPDATED, 1L));
+            expect(context.forward("key2", new Change<>("newValue2", null),
+                To.all().withTimestamp(42L))).andReturn(new AsyncProcessingResult(
+                Status.OFFSET_UPDATED, 2L));
         }
         expectLastCall();
         replay(store, context);

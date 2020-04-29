@@ -365,6 +365,7 @@ public class AssignedStreamsTasksTest {
     public void shouldNotProcessUnprocessableTasks() {
         mockTaskInitialization();
         EasyMock.expect(t1.isProcessable(0L)).andReturn(false);
+        EasyMock.expect(t1.shouldCheckOffset(0L)).andReturn(false);
         EasyMock.replay(t1);
         addAndInitTask();
 
@@ -387,6 +388,38 @@ public class AssignedStreamsTasksTest {
 
         EasyMock.verify(t1);
     }
+
+    @Test
+    public void shouldCallCheckOffset() {
+        mockTaskInitialization();
+        EasyMock.expect(t1.isProcessable(0L)).andReturn(false);
+        EasyMock.expect(t1.shouldCheckOffset(0L)).andReturn(true);
+        EasyMock.expect(t1.checkOffset()).andReturn(true).once();
+
+        EasyMock.replay(t1);
+
+        addAndInitTask();
+
+        assertThat(assignedTasks.process(0L), equalTo(1));
+
+        EasyMock.verify(t1);
+    }
+
+    @Test
+    public void shouldNotCallCheckOffset() {
+        mockTaskInitialization();
+        EasyMock.expect(t1.isProcessable(0L)).andReturn(false);
+        EasyMock.expect(t1.shouldCheckOffset(0L)).andReturn(false);
+
+        EasyMock.replay(t1);
+
+        addAndInitTask();
+
+        assertThat(assignedTasks.process(0L), equalTo(0));
+
+        EasyMock.verify(t1);
+    }
+
 
     @Test
     public void shouldPunctuateRunningTasks() {

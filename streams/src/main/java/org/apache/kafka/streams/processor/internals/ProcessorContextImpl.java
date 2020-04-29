@@ -16,11 +16,17 @@
  */
 package org.apache.kafka.streams.processor.internals;
 
+import static org.apache.kafka.streams.internals.ApiUtils.prepareMillisCheckFailMsgPrefix;
+import static org.apache.kafka.streams.processor.AsyncProcessingResult.Status.OFFSET_UPDATED;
+
+import java.time.Duration;
+import java.util.List;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.internals.ApiUtils;
 import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
@@ -39,11 +45,6 @@ import org.apache.kafka.streams.state.WindowStore;
 import org.apache.kafka.streams.state.WindowStoreIterator;
 import org.apache.kafka.streams.state.internals.ThreadCache;
 import org.apache.kafka.streams.state.internals.WrappedStateStore;
-
-import java.time.Duration;
-import java.util.List;
-
-import static org.apache.kafka.streams.internals.ApiUtils.prepareMillisCheckFailMsgPrefix;
 
 public class ProcessorContextImpl extends AbstractProcessorContext implements RecordCollector.Supplier {
 
@@ -128,18 +129,18 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value) {
-        forward(key, value, SEND_TO_ALL);
+        return forward(key, value, SEND_TO_ALL);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> void forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value,
                                final int childIndex) {
-        forward(
+        return forward(
             key,
             value,
             To.child(((List<ProcessorNode>) currentNode().children()).get(childIndex).name()));
@@ -148,19 +149,21 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> void forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value,
                                final String childName) {
-        forward(key, value, To.child(childName));
+        return forward(key, value, To.child(childName));
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key,
+    public <K, V> AsyncProcessingResult forward(final K key,
                                final V value,
                                final To to) {
         final ProcessorNode previousNode = currentNode();
         final ProcessorRecordContext previousContext = recordContext;
+        AsyncProcessingResult lastProcessedOffset = new AsyncProcessingResult(OFFSET_UPDATED,
+            recordContext.offset());
 
         try {
             toInternal.update(to);
@@ -173,32 +176,36 @@ public class ProcessorContextImpl extends AbstractProcessorContext implements Re
                     recordContext.headers());
             }
 
+            final boolean offsetCheckRecord = recordContext.headers().lastHeader(ProcessorContext.OFFSET_CHECK_RECORD_HEADER) != null;
             final String sendTo = toInternal.child();
             if (sendTo == null) {
                 final List<ProcessorNode<K, V>> children = (List<ProcessorNode<K, V>>) currentNode().children();
-                for (final ProcessorNode child : children) {
-                    forward(child, key, value);
-                }
+                lastProcessedOffset = children.stream()
+                        .filter(child -> !offsetCheckRecord || child.acceptsOffsetCheckMessage())
+                        .map(child -> forward(child, key, value))
+                        .reduce((offset1, offset2) -> offset1.merge(offset2))
+                        .orElse(lastProcessedOffset);
             } else {
                 final ProcessorNode child = currentNode().getChild(sendTo);
                 if (child == null) {
                     throw new StreamsException("Unknown downstream node: " + sendTo
                         + " either does not exist or is not connected to this processor.");
                 }
-                forward(child, key, value);
+                lastProcessedOffset = !offsetCheckRecord || child.acceptsOffsetCheckMessage() ? forward(child, key, value) : lastProcessedOffset;
             }
         } finally {
             recordContext = previousContext;
             setCurrentNode(previousNode);
         }
+        return lastProcessedOffset;
     }
 
     @SuppressWarnings("unchecked")
-    private <K, V> void forward(final ProcessorNode child,
+    private <K, V> AsyncProcessingResult forward(final ProcessorNode child,
                                 final K key,
                                 final V value) {
         setCurrentNode(child);
-        child.process(key, value);
+        return child.maybeProcessAsync(key, value, offset());
     }
 
     @Override

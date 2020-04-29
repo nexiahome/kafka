@@ -54,6 +54,7 @@ public class MockProcessorContextTest {
         };
 
         final MockProcessorContext context = new MockProcessorContext();
+        context.setOffset(1L);
         processor.init(context);
 
         processor.process("foo", 5L);
@@ -79,6 +80,7 @@ public class MockProcessorContextTest {
         };
 
         final MockProcessorContext context = new MockProcessorContext();
+        context.setOffset(1L);
 
         processor.init(context);
 
@@ -112,6 +114,7 @@ public class MockProcessorContextTest {
         };
 
         final MockProcessorContext context = new MockProcessorContext();
+        context.setOffset(1L);
 
         processor.init(context);
 

@@ -26,11 +26,15 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.ProducerFencedException;
 import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.metrics.stats.Count;
 import org.apache.kafka.common.metrics.stats.Max;
 import org.apache.kafka.common.metrics.stats.Rate;
+import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.DeserializationExceptionHandler;
@@ -38,6 +42,7 @@ import org.apache.kafka.streams.errors.ProcessorStateException;
 import org.apache.kafka.streams.errors.ProductionExceptionHandler;
 import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.errors.TaskMigratedException;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -46,6 +51,7 @@ import org.apache.kafka.streams.processor.TimestampExtractor;
 import org.apache.kafka.streams.processor.internals.metrics.CumulativeCount;
 import org.apache.kafka.streams.processor.internals.metrics.StreamsMetricsImpl;
 import org.apache.kafka.streams.state.internals.ThreadCache;
+import org.apache.kafka.streams.processor.ProcessorContext;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -65,24 +71,29 @@ import static org.apache.kafka.streams.kstream.internals.metrics.Sensors.recordL
 public class StreamTask extends AbstractTask implements ProcessorNodePunctuator {
 
     private static final ConsumerRecord<Object, Object> DUMMY_RECORD = new ConsumerRecord<>(ProcessorContextImpl.NONEXIST_TOPIC, -1, -1L, null, null);
+    public static final RecordHeaders OFFSET_CHECK_MESSAGE_HEADERS = new RecordHeaders(new Header[] {new RecordHeader(ProcessorContext.OFFSET_CHECK_RECORD_HEADER, new byte[] {(byte) 1})});
 
     private final Time time;
     private final long maxTaskIdleMs;
+    private final long maxTaskOffsetCheckIdleMs;
     private final int maxBufferedSize;
     private final TaskMetrics taskMetrics;
     private final PartitionGroup partitionGroup;
     private final RecordCollector recordCollector;
     private final PartitionGroup.RecordInfo recordInfo;
     private final Map<TopicPartition, Long> consumedOffsets;
+    private final Map<TopicPartition, Long> earliestOffsets;
     private final PunctuationQueue streamTimePunctuationQueue;
     private final PunctuationQueue systemTimePunctuationQueue;
     private final ProducerSupplier producerSupplier;
 
     private Sensor closeSensor;
     private long idleStartTime;
+    private long offsetIdleStartTime;
     private Producer<byte[], byte[]> producer;
     private boolean commitRequested = false;
     private boolean transactionInFlight = false;
+    private StampedRecord savedRecord;
 
     protected static final class TaskMetrics {
         final StreamsMetricsImpl metrics;
@@ -210,8 +221,10 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         streamTimePunctuationQueue = new PunctuationQueue();
         systemTimePunctuationQueue = new PunctuationQueue();
         maxTaskIdleMs = config.getLong(StreamsConfig.MAX_TASK_IDLE_MS_CONFIG);
+        maxTaskOffsetCheckIdleMs = config.getLong(StreamsConfig.MAX_TASK_OFFSET_CHECK_IDLE_MS_CONFIG);
         maxBufferedSize = config.getInt(StreamsConfig.BUFFERED_RECORDS_PER_PARTITION_CONFIG);
 
+        earliestOffsets = new HashMap<>();
         // initialize the consumed and committed offset cache
         consumedOffsets = new HashMap<>();
 
@@ -285,6 +298,8 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
 
         idleStartTime = RecordQueue.UNKNOWN;
 
+        offsetIdleStartTime = RecordQueue.UNKNOWN;
+
         stateMgr.ensureStoresRegistered();
     }
 
@@ -315,6 +330,25 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         }
     }
 
+
+    boolean shouldCheckOffset(final long now) {
+        if (partitionGroup.numBuffered() > 0) {
+            return false;
+        }
+
+        if (offsetIdleStartTime == RecordQueue.UNKNOWN) {
+            offsetIdleStartTime = now;
+        }
+
+        if (now - offsetIdleStartTime >= maxTaskOffsetCheckIdleMs) {
+            offsetIdleStartTime = RecordQueue.UNKNOWN; //reset for next iteration
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
     /**
      * An active task is processable if its buffer contains data for all of its input
      * source topic partitions, or if it is enforced to be processable
@@ -339,6 +373,55 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
         }
     }
 
+    private boolean addOffsetCheckMessageToPartition(final TopicPartition p, final long lastOffset) {
+        if (log.isTraceEnabled()) {
+            log.trace("Add check offset message topic {} partition {} offset {}", p.topic(), p.partition(), consumedOffsets.get(p));
+        }
+        addRecords(p, singleton(new ConsumerRecord<>(
+                p.topic(),
+                p.partition(),
+                lastOffset,
+                lastOffset, // use the offset as the timestamp
+                TimestampType.CREATE_TIME,
+                0L,
+                0,
+                0,
+                null,
+                null,
+                OFFSET_CHECK_MESSAGE_HEADERS)));
+        return true;
+    }
+
+    public boolean addOffsetCheckMessagesToEmptyQueues() {
+        if (log.isTraceEnabled()) {
+            log.trace("May be add Offset Check Messages to Queues for {} partitions", consumedOffsets.size());
+        }
+        return partitionGroup.partitions().stream()
+             // find partitions with no buffered messages and an available record offset
+            .filter(p -> partitionGroup.numBuffered(p) == 0 && (earliestOffsets.containsKey(p) || consumedOffsets.containsKey(p)))
+            .map(p -> addOffsetCheckMessageToPartition(p, consumedOffsets.getOrDefault(p, earliestOffsets.get(p))))
+            .count() > 0;
+    }
+
+    /*
+    * Save the offset of the very first record processed for a partition.
+    * It is used later as offset for OffsetCheckMessage. This is only useful until consumedOffset is populated for the partition
+    * Once consumedOffset is set, its offset will be used for OffsetCheckMessage
+    * */
+    private void saveEarliestOffset(final StampedRecord record, final TopicPartition partition) {
+        if (record != null && !earliestOffsets.containsKey(partition)) {
+            earliestOffsets.put(partition, record.offset());
+        }
+    }
+
+    public boolean checkOffset() {
+        if (addOffsetCheckMessagesToEmptyQueues()) {
+            return process();
+        } else {
+            return false;
+        }
+    }
+
     /**
      * Process one record.
      *
@@ -348,28 +431,34 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
     @SuppressWarnings("unchecked")
     public boolean process() {
         // get the next record to process
-        final StampedRecord record = partitionGroup.nextRecord(recordInfo);
-
-        // if there is no record to process, return immediately
-        if (record == null) {
-            return false;
+        final StampedRecord record;
+        if (savedRecord == null) {
+            record = partitionGroup.nextRecord(recordInfo);
+        } else {
+            record = savedRecord;
+            savedRecord = null;
         }
+        boolean didProcess = false;
 
         try {
             // process the record by passing to the source node of the topology
             final ProcessorNode currNode = recordInfo.node();
             final TopicPartition partition = recordInfo.partition();
 
+            saveEarliestOffset(record, partition);
+            if (currNode == null) {
+                log.trace("Skip processing one record [{}]", record);
+                return false;
+            }
+
             log.trace("Start processing one record [{}]", record);
 
             updateProcessorContext(record, currNode);
-            currNode.process(record.key(), record.value());
+            final AsyncProcessingResult result = currNode.maybeProcessAsync(record.key(), record.value(), record.offset());
 
             log.trace("Completed processing one record [{}]", record);
 
-            // update the consumed offset map after processing is done
-            consumedOffsets.put(partition, record.offset());
-            commitNeeded = true;
+            didProcess = handleProcessingResult(record, partition, result);
 
             // after processing this record, if its partition queue's buffered size has been
             // decreased to the threshold, we can then resume the consumption on this partition
@@ -393,7 +482,34 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
             processorContext.setCurrentNode(null);
         }
 
-        return true;
+        return didProcess;
+    }
+
+    private boolean handleProcessingResult(
+        final StampedRecord record,
+        final TopicPartition partition, final AsyncProcessingResult result) {
+        if (log.isTraceEnabled()) {
+            log.trace("Async Processing Result [{}]", result);
+        }
+        boolean didProcess = false;
+        switch (result.getStatus()) {
+            case OFFSET_NOT_UPDATED:
+                // do nothing? Not sure what to do here
+                break;
+            case ASYNC_PAUSE:
+                this.savedRecord = record;
+                // TODO: save off the record to be retried later.
+                break;
+            case OFFSET_UPDATED:
+                // update the consumed offset map after processing is done
+                if (!consumedOffsets.containsKey(partition) || consumedOffsets.get(partition) < result.getLastProcessedOffset()) {
+                    consumedOffsets.put(partition, result.getLastProcessedOffset());
+                    commitNeeded = true;
+                }
+                didProcess = true;
+        }
+
+        return didProcess;
     }
 
     private String getStacktraceString(final KafkaException e) {

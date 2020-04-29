@@ -20,6 +20,7 @@ import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.StreamsMetrics;
 import org.apache.kafka.streams.errors.StreamsException;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
@@ -42,6 +43,15 @@ public final class ForwardingDisabledProcessorContext implements ProcessorContex
 
     public ForwardingDisabledProcessorContext(final ProcessorContext delegate) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
+    }
+
+    @Override
+    public Object clone() {
+        try {
+            return super.clone();
+        } catch (final CloneNotSupportedException e) {
+            throw new AssertionError("Can't clone " + this);
+        }
     }
 
     @Override
@@ -101,24 +111,24 @@ public final class ForwardingDisabledProcessorContext implements ProcessorContex
     }
 
     @Override
-    public <K, V> void forward(final K key, final V value) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value) {
         throw new StreamsException("ProcessorContext#forward() not supported.");
     }
 
     @Override
-    public <K, V> void forward(final K key, final V value, final To to) {
-        throw new StreamsException("ProcessorContext#forward() not supported.");
-    }
-
-    @Override
-    @Deprecated
-    public <K, V> void forward(final K key, final V value, final int childIndex) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final To to) {
         throw new StreamsException("ProcessorContext#forward() not supported.");
     }
 
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final String childName) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final int childIndex) {
+        throw new StreamsException("ProcessorContext#forward() not supported.");
+    }
+
+    @Override
+    @Deprecated
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final String childName) {
         throw new StreamsException("ProcessorContext#forward() not supported.");
     }
 

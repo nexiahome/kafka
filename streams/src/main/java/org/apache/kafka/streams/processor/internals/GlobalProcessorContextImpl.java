@@ -16,7 +16,11 @@
  */
 package org.apache.kafka.streams.processor.internals;
 
+import java.time.Duration;
+import java.util.List;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -35,9 +39,6 @@ import org.apache.kafka.streams.state.TimestampedKeyValueStore;
 import org.apache.kafka.streams.state.TimestampedWindowStore;
 import org.apache.kafka.streams.state.WindowStore;
 import org.apache.kafka.streams.state.internals.ThreadCache;
-
-import java.time.Duration;
-import java.util.List;
 
 public class GlobalProcessorContextImpl extends AbstractProcessorContext {
 
@@ -71,43 +72,49 @@ public class GlobalProcessorContextImpl extends AbstractProcessorContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key, final V value) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value) {
         final ProcessorNode previousNode = currentNode();
+        final AsyncProcessingResult lastProcessedOffset = new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
         try {
             for (final ProcessorNode child : (List<ProcessorNode<K, V>>) currentNode().children()) {
                 setCurrentNode(child);
-                child.process(key, value);
+                lastProcessedOffset.merge(child.maybeProcessAsync(key, value, offset()));
             }
         } finally {
             setCurrentNode(previousNode);
         }
+        return lastProcessedOffset;
     }
 
     /**
      * No-op. This should only be called on GlobalStateStore#flush and there should be no child nodes
+     * @return
      */
     @Override
-    public <K, V> void forward(final K key, final V value, final To to) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final To to) {
         if (!currentNode().children().isEmpty()) {
             throw new IllegalStateException("This method should only be called on 'GlobalStateStore.flush' that should not have any children.");
         }
+        return new AsyncProcessingResult(Status.OFFSET_UPDATED, recordContext().offset());
     }
 
     /**
      * @throws UnsupportedOperationException on every invocation
+     * @return
      */
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final int childIndex) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final int childIndex) {
         throw new UnsupportedOperationException("this should not happen: forward() not supported in global processor context.");
     }
 
     /**
      * @throws UnsupportedOperationException on every invocation
+     * @return
      */
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final String childName) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final String childName) {
         throw new UnsupportedOperationException("this should not happen: forward() not supported in global processor context.");
     }
 

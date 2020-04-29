@@ -62,6 +62,15 @@ public abstract class AbstractProcessorContext implements InternalProcessorConte
     }
 
     @Override
+    public Object clone() {
+        try {
+            return super.clone();
+        } catch (final CloneNotSupportedException e) {
+            throw new AssertionError("Unable to clone " + this);
+        }
+    }
+
+    @Override
     public String applicationId() {
         return applicationId;
     }

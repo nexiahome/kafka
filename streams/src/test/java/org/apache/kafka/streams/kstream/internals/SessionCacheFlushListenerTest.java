@@ -17,6 +17,8 @@
 package org.apache.kafka.streams.kstream.internals;
 
 import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.To;
 import org.apache.kafka.streams.processor.internals.InternalProcessorContext;
 import org.junit.Test;
@@ -34,10 +36,11 @@ public class SessionCacheFlushListenerTest {
         expect(context.currentNode()).andReturn(null).anyTimes();
         context.setCurrentNode(null);
         context.setCurrentNode(null);
-        context.forward(
+        expect(context.forward(
             new Windowed<>("key", new SessionWindow(21L, 73L)),
             new Change<>("newValue", "oldValue"),
-            To.all().withTimestamp(73L));
+            To.all().withTimestamp(73L)))
+            .andReturn(new AsyncProcessingResult(Status.OFFSET_UPDATED, 1L));
         expectLastCall();
         replay(context);
 

@@ -16,9 +16,12 @@
  */
 package org.apache.kafka.streams.processor.internals;
 
+import static org.apache.kafka.streams.processor.AsyncProcessingResult.Status.OFFSET_UPDATED;
+
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.kstream.internals.ChangedSerializer;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
 import org.apache.kafka.streams.processor.StreamPartitioner;
 import org.apache.kafka.streams.processor.TopicNameExtractor;
 
@@ -100,6 +103,17 @@ public class SinkNode<K, V> extends ProcessorNode<K, V> {
                                     valueClass),
                     e);
         }
+    }
+
+    @Override
+    public AsyncProcessingResult maybeProcessAsync(final K key, final V value, final long offset) {
+        process(key, value);
+        return new AsyncProcessingResult(OFFSET_UPDATED, offset);
+    }
+
+    @Override
+    public boolean acceptsOffsetCheckMessage() {
+        return false;
     }
 
     /**

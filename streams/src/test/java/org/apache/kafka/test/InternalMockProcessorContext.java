@@ -16,6 +16,16 @@
  */
 package org.apache.kafka.test;
 
+import static org.apache.kafka.streams.processor.internals.StateRestoreCallbackAdapter.adapt;
+
+import java.io.File;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeaders;
@@ -23,6 +33,8 @@ import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.AsyncProcessingResult.Status;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -41,17 +53,6 @@ import org.apache.kafka.streams.processor.internals.ToInternal;
 import org.apache.kafka.streams.processor.internals.metrics.StreamsMetricsImpl;
 import org.apache.kafka.streams.state.StateSerdes;
 import org.apache.kafka.streams.state.internals.ThreadCache;
-
-import java.io.File;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.kafka.streams.processor.internals.StateRestoreCallbackAdapter.adapt;
 
 public class InternalMockProcessorContext extends AbstractProcessorContext implements RecordCollector.Supplier {
 
@@ -211,27 +212,28 @@ public class InternalMockProcessorContext extends AbstractProcessorContext imple
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key, final V value) {
-        forward(key, value, To.all());
+    public <K, V> AsyncProcessingResult forward(final K key, final V value) {
+        return forward(key, value, To.all());
     }
 
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final int childIndex) {
-        forward(key, value, To.child(((List<ProcessorNode>) currentNode().children()).get(childIndex).name()));
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final int childIndex) {
+        return forward(key, value, To.child(((List<ProcessorNode>) currentNode().children()).get(childIndex).name()));
     }
 
     @SuppressWarnings("unchecked")
     @Override
     @Deprecated
-    public <K, V> void forward(final K key, final V value, final String childName) {
-        forward(key, value, To.child(childName));
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final String childName) {
+        return forward(key, value, To.child(childName));
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <K, V> void forward(final K key, final V value, final To to) {
+    public <K, V> AsyncProcessingResult forward(final K key, final V value, final To to) {
+        AsyncProcessingResult lastProcessedOffset = new AsyncProcessingResult(Status.OFFSET_UPDATED, offset());
         toInternal.update(to);
         if (toInternal.hasTimestamp()) {
             setTime(toInternal.timestamp());
@@ -241,13 +243,14 @@ public class InternalMockProcessorContext extends AbstractProcessorContext imple
             for (final ProcessorNode childNode : (List<ProcessorNode<K, V>>) thisNode.children()) {
                 if (toInternal.child() == null || toInternal.child().equals(childNode.name())) {
                     currentNode = childNode;
-                    childNode.process(key, value);
+                    lastProcessedOffset.merge(childNode.maybeProcessAsync(key, value, recordContext().offset()));
                     toInternal.update(to); // need to reset because MockProcessorContext is shared over multiple Processors and toInternal might have been modified
                 }
             }
         } finally {
             currentNode = thisNode;
         }
+        return lastProcessedOffset;
     }
 
     // allow only setting time but not other fields in for record context,

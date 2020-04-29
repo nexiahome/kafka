@@ -16,19 +16,20 @@
  */
 package org.apache.kafka.test;
 
-import org.apache.kafka.streams.KeyValueTimestamp;
-import org.apache.kafka.streams.processor.AbstractProcessor;
-import org.apache.kafka.streams.processor.Cancellable;
-import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.processor.PunctuationType;
-import org.apache.kafka.streams.state.ValueAndTimestamp;
+import static org.apache.kafka.streams.processor.AsyncProcessingResult.Status.OFFSET_UPDATED;
+import static org.junit.Assert.assertEquals;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
+import org.apache.kafka.streams.KeyValueTimestamp;
+import org.apache.kafka.streams.processor.AbstractProcessor;
+import org.apache.kafka.streams.processor.AsyncProcessingResult;
+import org.apache.kafka.streams.processor.Cancellable;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.processor.PunctuationType;
+import org.apache.kafka.streams.state.ValueAndTimestamp;
 
 @SuppressWarnings("WeakerAccess")
 public class MockProcessor<K, V> extends AbstractProcessor<K, V> {
@@ -48,6 +49,8 @@ public class MockProcessor<K, V> extends AbstractProcessor<K, V> {
     private final long scheduleInterval;
 
     private boolean commitRequested = false;
+    private boolean overrideAsyncReturn = false;
+    private AsyncProcessingResult overrideAsyncReturnValue;
 
     public MockProcessor(final PunctuationType punctuationType,
                          final long scheduleInterval) {
@@ -99,6 +102,13 @@ public class MockProcessor<K, V> extends AbstractProcessor<K, V> {
             context().commit();
             commitRequested = false;
         }
+    }
+
+    @Override
+    public AsyncProcessingResult maybeProcessAsync(K key, V value, long offset) {
+        process(key, value);
+        return overrideAsyncReturn ? overrideAsyncReturnValue :
+            new AsyncProcessingResult(OFFSET_UPDATED, offset);
     }
 
     public void checkAndClearProcessResult(final String... expected) {
