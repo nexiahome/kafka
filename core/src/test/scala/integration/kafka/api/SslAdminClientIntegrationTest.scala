@@ -18,8 +18,8 @@ import java.util.Collections
 import java.util.concurrent._
 import java.util.function.BiConsumer
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Gauge
 import kafka.security.authorizer.AclAuthorizer
 import kafka.security.authorizer.AuthorizerUtils.{WildcardHost, WildcardPrincipal}
 import kafka.security.auth.{Operation, PermissionType}
@@ -287,11 +287,11 @@ class SslAdminClientIntegrationTest extends SaslSslAdminClientIntegrationTest {
   }
 
   private def purgatoryMetric(name: String): Int = {
-    val allMetrics = Metrics.defaultRegistry.allMetrics.asScala
+    val allMetrics = SharedMetricRegistries.getOrCreate("default").getMetrics.asScala
     val metrics = allMetrics.filter { case (metricName, _) =>
-      metricName.getMBeanName.contains("delayedOperation=AlterAcls") && metricName.getMBeanName.contains(s"name=$name")
+      metricName.contains("delayedOperation=AlterAcls") && metricName.contains(s"name=$name")
     }.values.toList
-    assertTrue(s"Unable to find metric $name: allMetrics: ${allMetrics.keySet.map(_.getMBeanName)}", metrics.nonEmpty)
-    metrics.map(_.asInstanceOf[Gauge[Int]].value).sum
+    assertTrue(s"Unable to find metric $name: allMetrics: ${allMetrics.keySet}", metrics.nonEmpty)
+    metrics.map(_.asInstanceOf[Gauge[Int]].getValue).sum
   }
 }

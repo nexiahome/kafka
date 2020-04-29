@@ -20,7 +20,7 @@
 ext {
   versions = [:]
   libs = [:]
-  
+
   // Enabled by default when commands like `testAll` are invoked
   defaultScalaVersions = [ '2.11', '2.12', '2.13' ]
   // Available if -PscalaVersion is used. This is useful when we want to support a Scala version that has
@@ -60,9 +60,11 @@ if ( !versions.scala.contains('-') ) {
 
 versions += [
   activation: "1.1.1",
-  apacheda: "1.0.2",
-  apacheds: "2.0.0-M24",
-  argparse4j: "0.7.0",
+  akka: "2.6.1",
+  akkaHttp: "10.1.11",
+  apacheda: "2.0.0.AM2",
+  apacheds: "2.0.0.AM25",
+  argparse4j: "0.8.1",
   bcpkix: "1.63",
   checkstyle: "8.20",
   commonsCli: "1.4",
@@ -79,9 +81,9 @@ versions += [
   hamcrest: "2.1",
   log4j: "1.2.17",
   scalaLogging: "3.9.2",
-  jaxb: "2.3.0",
+  jaxb: "2.3.1",
   jaxrs: "2.1.1",
-  jfreechart: "1.0.0",
+  jfreechart: "1.5.0",
   jopt: "5.0.4",
   junit: "4.13-beta-2",
   kafka_0100: "0.10.0.1",
@@ -96,12 +98,14 @@ versions += [
   kafka_23: "2.3.1",
   lz4: "1.6.0",
   mavenArtifact: "3.6.1",
-  metrics: "2.2.0",
+  metrics: "4.1.2",
   mockito: "3.0.0",
   owaspDepCheckPlugin: "5.2.1",
   powermock: "2.0.2",
+  prometheus: "0.8.0",
+  prometheusAkkaHttp: "0.5.0",
   reflections: "0.9.11",
-  rocksDB: "5.18.3",
+  rocksDB: "5.18.33",
   scalaCollectionCompat: "2.1.2",
   scalafmt: "1.5.1",
   scalaJava8Compat : "0.9.0",
@@ -120,6 +124,9 @@ versions += [
 
 libs += [
   activation: "javax.activation:activation:$versions.activation",
+  akkaActor: "com.typesafe.akka:akka-actor_$versions.baseScala:$versions.akka",
+  akkaStream: "com.typesafe.akka:akka-stream_$versions.baseScala:$versions.akka",
+  akkaHttp: "com.typesafe.akka:akka-http_$versions.baseScala:$versions.akkaHttp",
   apacheda: "org.apache.directory.api:api-all:$versions.apacheda",
   apachedsCoreApi: "org.apache.directory.server:apacheds-core-api:$versions.apacheds",
   apachedsInterceptorKerberos: "org.apache.directory.server:apacheds-interceptor-kerberos:$versions.apacheds",
@@ -164,10 +171,13 @@ libs += [
   kafkaStreams_23: "org.apache.kafka:kafka-streams:$versions.kafka_23",
   log4j: "log4j:log4j:$versions.log4j",
   lz4: "org.lz4:lz4-java:$versions.lz4",
-  metrics: "com.yammer.metrics:metrics-core:$versions.metrics",
+  metrics: "io.dropwizard.metrics:metrics-core:$versions.metrics",
   mockitoCore: "org.mockito:mockito-core:$versions.mockito",
   powermockJunit4: "org.powermock:powermock-module-junit4:$versions.powermock",
   powermockEasymock: "org.powermock:powermock-api-easymock:$versions.powermock",
+  prometheus: "io.prometheus:simpleclient:$versions.prometheus",
+  prometheusHotspot: "io.prometheus:simpleclient_hotspot:$versions.prometheus",
+  prometheusAkkaHttp: "com.lonelyplanet:prometheus-akka-http_$versions.baseScala:$versions.prometheusAkkaHttp",
   reflections: "org.reflections:reflections:$versions.reflections",
   rocksDBJni: "org.rocksdb:rocksdbjni:$versions.rocksDB",
   scalaCollectionCompat: "org.scala-lang.modules:scala-collection-compat_$versions.baseScala:$versions.scalaCollectionCompat",
@@ -182,7 +192,7 @@ libs += [
   slf4jlog4j: "org.slf4j:slf4j-log4j12:$versions.slf4j",
   snappy: "org.xerial.snappy:snappy-java:$versions.snappy",
   zookeeper: "org.apache.zookeeper:zookeeper:$versions.zookeeper",
-  jfreechart: "jfreechart:jfreechart:$versions.jfreechart",
+  jfreechart: "org.jfree:jfreechart:$versions.jfreechart",
   mavenArtifact: "org.apache.maven:maven-artifact:$versions.mavenArtifact",
   zstd: "com.github.luben:zstd-jni:$versions.zstd",
   httpclient: "org.apache.httpcomponents:httpclient:$versions.httpclient"

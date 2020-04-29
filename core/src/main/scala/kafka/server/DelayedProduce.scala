@@ -20,7 +20,7 @@ package kafka.server
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.Lock
 
-import com.yammer.metrics.core.Meter
+import com.codahale.metrics.Meter
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils.Pool
 import org.apache.kafka.common.TopicPartition
@@ -143,4 +143,3 @@ object DelayedProduceMetrics extends KafkaMetricsGroup {
     partitionExpirationMeters.getAndMaybePut(partition).mark()
   }
 }
-

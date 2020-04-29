@@ -16,7 +16,7 @@
  */
 package kafka.cluster
 
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.{Optional, Properties}
 
@@ -204,7 +204,7 @@ class Partition(val topicPartition: TopicPartition,
 
   newGauge("UnderReplicated",
     new Gauge[Int] {
-      def value: Int = {
+      def getValue: Int = {
         if (isUnderReplicated) 1 else 0
       }
     },
@@ -213,7 +213,7 @@ class Partition(val topicPartition: TopicPartition,
 
   newGauge("InSyncReplicasCount",
     new Gauge[Int] {
-      def value: Int = {
+      def getValue: Int = {
         if (isLeader) inSyncReplicaIds.size else 0
       }
     },
@@ -222,7 +222,7 @@ class Partition(val topicPartition: TopicPartition,
 
   newGauge("UnderMinIsr",
     new Gauge[Int] {
-      def value: Int = {
+      def getValue: Int = {
         if (isUnderMinIsr) 1 else 0
       }
     },
@@ -231,7 +231,7 @@ class Partition(val topicPartition: TopicPartition,
 
   newGauge("AtMinIsr",
     new Gauge[Int] {
-      def value: Int = {
+      def getValue: Int = {
         if (isAtMinIsr) 1 else 0
       }
     },
@@ -240,7 +240,7 @@ class Partition(val topicPartition: TopicPartition,
 
   newGauge("ReplicasCount",
     new Gauge[Int] {
-      def value: Int = {
+      def getValue: Int = {
         if (isLeader) allReplicaIds.size else 0
       }
     },
@@ -249,7 +249,7 @@ class Partition(val topicPartition: TopicPartition,
 
   newGauge("LastStableOffsetLag",
     new Gauge[Long] {
-      def value: Long = {
+      def getValue: Long = {
         log.map(_.lastStableOffsetLag).getOrElse(0)
       }
     },

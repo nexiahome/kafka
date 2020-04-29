@@ -24,6 +24,18 @@ buildscript {
     maven {
       url "https://plugins.gradle.org/m2/"
     }
+    maven {
+      url "https://dl.bintray.com/lonelyplanet/maven"
+    }
+    maven {
+      url "https://artifactory.nexiabuild.com/artifactory/libs-release"
+      // to develop locally, copy these values from your ~/.m2/settings.xml
+      // DO NOT commit them! We do not want to commit secrets to github.
+      credentials {
+        username __FIXUSER__
+        password __FIXPASSWD__
+      }
+    }
   }
   apply from: file('gradle/buildscript.gradle'), to: buildscript
   apply from: "$rootDir/gradle/dependencies.gradle"
@@ -53,8 +65,19 @@ allprojects {
 
   repositories {
     mavenCentral()
+    maven {
+      url "https://dl.bintray.com/lonelyplanet/maven"
+    }
+    maven {
+      url "https://artifactory.nexiabuild.com/artifactory/libs-release"
+      // to develop locally, copy these values from your ~/.m2/settings.xml
+      // DO NOT commit them! We do not want to commit secrets to github.
+      credentials {
+          username __FIXUSER__
+          password __FIXPASSWD__
+      }
+    }
   }
-  
   apply plugin: 'idea'
   apply plugin: 'org.owasp.dependencycheck'
   apply plugin: 'com.github.ben-manes.versions'
@@ -435,7 +458,7 @@ subprojects {
         "-Xlint:unused"
       ]
     }
-    
+
   // these options are valid for Scala versions < 2.13 only
   // Scala 2.13 removes them, see https://github.com/scala/scala/pull/6502 and https://github.com/scala/scala/pull/5969
     if (versions.baseScala in ['2.11','2.12']) {
@@ -533,8 +556,8 @@ def fineTuneEclipseClasspathFile(eclipse, project) {
       if (project.name.equals('core')) {
         cp.entries.findAll { it.kind == "src" && it.path.equals("src/test/scala") }*.excludes = ["integration/", "other/", "unit/"]
       }
-      /* 
-       * Set all eclipse build output to go to 'build_eclipse' directory. This is to ensure that gradle and eclipse use different 
+      /*
+       * Set all eclipse build output to go to 'build_eclipse' directory. This is to ensure that gradle and eclipse use different
        * build output directories, and also avoid using the eclpise default of 'bin' which clashes with some of our script directories.
        * https://discuss.gradle.org/t/eclipse-generated-files-should-be-put-in-the-same-place-as-the-gradle-generated-files/6986/2
        */
@@ -684,6 +707,12 @@ project(':core') {
     compile libs.jacksonJDK8Datatypes
     compile libs.joptSimple
     compile libs.metrics
+    compile libs.akkaActor
+    compile libs.akkaStream
+    compile libs.akkaHttp
+    compile libs.prometheus
+    compile libs.prometheusHotspot
+    compile libs.prometheusAkkaHttp
     compile libs.scalaCollectionCompat
     compile libs.scalaJava8Compat
     compile libs.scalaLibrary
@@ -727,7 +756,7 @@ project(':core') {
     scoverage libs.scoveragePlugin
     scoverage libs.scoverageRuntime
   }
-  
+
   scoverage {
     reportDir = file("${rootProject.buildDir}/scoverage")
     highlighting = false

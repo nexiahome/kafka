@@ -18,7 +18,7 @@ package kafka.controller
 
 import java.util.concurrent.TimeUnit
 
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import kafka.admin.AdminOperationException
 import kafka.api._
 import kafka.common._
@@ -123,70 +123,70 @@ class KafkaController(val config: KafkaConfig,
   newGauge(
     "ActiveControllerCount",
     new Gauge[Int] {
-      def value = if (isActive) 1 else 0
+      def getValue = if (isActive) 1 else 0
     }
   )
 
   newGauge(
     "OfflinePartitionsCount",
     new Gauge[Int] {
-      def value: Int = offlinePartitionCount
+      def getValue: Int = offlinePartitionCount
     }
   )
 
   newGauge(
     "PreferredReplicaImbalanceCount",
     new Gauge[Int] {
-      def value: Int = preferredReplicaImbalanceCount
+      def getValue: Int = preferredReplicaImbalanceCount
     }
   )
 
   newGauge(
     "ControllerState",
     new Gauge[Byte] {
-      def value: Byte = state.value
+      def getValue: Byte = state.value
     }
   )
 
   newGauge(
     "GlobalTopicCount",
     new Gauge[Int] {
-      def value: Int = globalTopicCount
+      def getValue: Int = globalTopicCount
     }
   )
 
   newGauge(
     "GlobalPartitionCount",
     new Gauge[Int] {
-      def value: Int = globalPartitionCount
+      def getValue: Int = globalPartitionCount
     }
   )
 
   newGauge(
     "TopicsToDeleteCount",
     new Gauge[Int] {
-      def value: Int = topicsToDeleteCount
+      def getValue: Int = topicsToDeleteCount
     }
   )
 
   newGauge(
     "ReplicasToDeleteCount",
     new Gauge[Int] {
-      def value: Int = replicasToDeleteCount
+      def getValue: Int = replicasToDeleteCount
     }
   )
 
   newGauge(
     "TopicsIneligibleToDeleteCount",
     new Gauge[Int] {
-      def value: Int = ineligibleTopicsToDeleteCount
+      def getValue: Int = ineligibleTopicsToDeleteCount
     }
   )
 
   newGauge(
     "ReplicasIneligibleToDeleteCount",
     new Gauge[Int] {
-      def value: Int = ineligibleReplicasToDeleteCount
+      def getValue: Int = ineligibleReplicasToDeleteCount
     }
   )
 

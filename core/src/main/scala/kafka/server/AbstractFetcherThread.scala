@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.function.Consumer
 
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.Gauge
 import kafka.log.LogAppendInfo
 import org.apache.kafka.common.{InvalidRecordException, TopicPartition}
 import org.apache.kafka.common.internals.PartitionStates
@@ -708,7 +708,7 @@ class FetcherLagMetrics(metricId: ClientIdTopicPartition) extends KafkaMetricsGr
 
   newGauge(FetcherMetrics.ConsumerLag,
     new Gauge[Long] {
-      def value = lagVal.get
+      def getValue = lagVal.get
     },
     tags
   )

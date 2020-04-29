@@ -16,8 +16,8 @@
  */
 package kafka.server
 
-import com.yammer.metrics.Metrics
-import com.yammer.metrics.core.Gauge
+import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.Gauge
 import kafka.cluster.BrokerEndPoint
 import kafka.utils.TestUtils
 import org.apache.kafka.common.TopicPartition
@@ -31,12 +31,12 @@ class AbstractFetcherManagerTest {
 
   @Before
   def cleanMetricRegistry(): Unit = {
-    TestUtils.clearYammerMetrics()
+    TestUtils.clearDropwizardMetrics()
   }
 
   private def getMetricValue(name: String): Any = {
-    Metrics.defaultRegistry.allMetrics.asScala.filterKeys(_.getName == name).values.headOption.get.
-      asInstanceOf[Gauge[Int]].value()
+    SharedMetricRegistries.getOrCreate("default").getMetrics.asScala.filterKeys(_.contains(s".{name=$name}")).values.headOption.get.
+      asInstanceOf[Gauge[Int]].getValue()
   }
 
   @Test
